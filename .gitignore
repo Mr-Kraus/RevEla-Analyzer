@@ -1,0 +1,13 @@
+# Ambientes Virtuais
+venv/
+env/
+.env
+
+# Cache do Python e Pytest
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# O Golden Case C01 tem 40MB e dados do cliente, não sobe pro Git
+tests/fixtures/C01*
