@@ -73,3 +73,34 @@ class ComparisonEngine:
             })
             
         return comparison
+    @classmethod
+    def compare_multiple_scenarios(
+        cls, 
+        baseline_results: Dict[str, float], 
+        scenarios_results: Dict[str, Dict[str, float]], 
+        indicator: str
+    ) -> Dict[str, Any]:
+        """
+        Compara N cenários contra um baseline (Caso Base).
+        `scenarios_results` deve ser um dicionário onde a chave é o ID/Nome do cenário e o valor é o dict de resultados.
+        """
+        base_val = float(baseline_results.get(indicator, 0.0))
+        
+        multi_comparison = {}
+        for scenario_name, scenario_data in scenarios_results.items():
+            scen_val = float(scenario_data.get(indicator, 0.0))
+            multi_comparison[scenario_name] = cls.calculate_delta(base_val, scen_val)
+
+        # Adiciona um "Ranking" para ver qual cenário melhorou ou piorou mais o indicador
+        # (Para indicadores de adequação como EPNS, menor é melhor)
+        sorted_scenarios = sorted(
+            multi_comparison.items(), 
+            key=lambda item: item[1]["absolute_difference"]
+        )
+
+        return {
+            "baseline_value": base_val,
+            "indicator": indicator,
+            "comparisons": multi_comparison,
+            "best_to_worst_impact": [scen[0] for scen in sorted_scenarios]
+        }

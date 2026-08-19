@@ -61,3 +61,18 @@ class RankingEngine:
     ) -> List[Dict[str, Any]]:
         """Rankeia as Regiões elétricas mais críticas."""
         return cls.rank_elements(region_aggregated_results, metric_key=indicator, top_n=top_n, descending=True)
+    
+    @classmethod
+    def rank_top_generators(cls, generators: List[Dict[str, Any]], top_n: int = 10) -> List[Dict[str, Any]]:
+        """Rankeia os maiores geradores do sistema por Capacidade."""
+        return cls.rank_elements(generators, metric_key="capacity_mva", top_n=top_n, descending=True)
+
+    @classmethod
+    def rank_top_lines(cls, lines: List[Dict[str, Any]], top_n: int = 10) -> List[Dict[str, Any]]:
+        """Rankeia as linhas com maior taxa de falha (gargalos de confiabilidade)."""
+        return cls.rank_elements(lines, metric_key="failure_rate", top_n=top_n, descending=True)
+
+    @classmethod
+    def rank_top_transformers(cls, transformers: List[Dict[str, Any]], top_n: int = 10) -> List[Dict[str, Any]]:
+        """Rankeia os transformadores com maior taxa de falha."""
+        return cls.rank_elements(transformers, metric_key="failure_rate", top_n=top_n, descending=True)

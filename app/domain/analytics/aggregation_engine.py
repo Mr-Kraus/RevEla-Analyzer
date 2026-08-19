@@ -42,3 +42,14 @@ class AggregationEngine:
             tech_aggregations[tech] = round(tech_aggregations.get(tech, 0.0) + val, 4)
             
         return tech_aggregations
+    
+    @staticmethod
+    def aggregate_by_bus(bus_results: List[Dict[str, Any]], indicator: str) -> Dict[str, float]:
+        """Agrega o valor de um indicador, pivotando pelo ID da barra."""
+        return {b.get("bus_external_id"): float(b.get(indicator, 0.0)) for b in bus_results}
+
+    @staticmethod
+    def aggregate_equipment_metrics(equipments: List[Dict[str, Any]], metric_key: str) -> Dict[str, float]:
+        """Soma total de uma métrica para uma lista de equipamentos (ex: soma de capacidade de trafos)."""
+        total = sum(float(eq.get(metric_key, 0.0)) for eq in equipments)
+        return {"total_system": round(total, 4)}

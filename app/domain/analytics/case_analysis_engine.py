@@ -30,6 +30,7 @@ class CaseAnalysisEngine:
         ]
         
         return sorted(region_analysis, key=lambda x: x[indicator], reverse=True)
+    
 
     @staticmethod
     def analyze_buses(bus_results: List[Dict[str, Any]], indicator: str = "epns") -> List[Dict[str, Any]]:
@@ -66,3 +67,43 @@ class CaseAnalysisEngine:
             })
             
         return sorted(analyzed_eqs, key=lambda x: x["value"], reverse=True)
+    
+    @staticmethod
+    def analyze_generators(generators: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Avalia a frota de geração baseada na sua capacidade e taxa de falha (se houver)."""
+        analyzed = []
+        for gen in generators:
+            cap = float(gen.get("capacity_mva", 0.0))
+            analyzed.append({
+                "generator_id": gen.get("external_id"),
+                "name": gen.get("name"),
+                "capacity_mva": cap,
+                # Lógica futura: cruzar capacidade com failure_rate para achar o "Risco Geração"
+            })
+        return sorted(analyzed, key=lambda x: x["capacity_mva"], reverse=True)
+
+    @staticmethod
+    def analyze_lines(lines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Avalia o impacto e criticidade das Linhas de Transmissão."""
+        analyzed = []
+        for line in lines:
+            frate = float(line.get("failure_rate", 0.0))
+            analyzed.append({
+                "line_id": line.get("external_id"),
+                "name": line.get("name"),
+                "failure_rate": frate
+            })
+        return sorted(analyzed, key=lambda x: x["failure_rate"], reverse=True)
+
+    @staticmethod
+    def analyze_transformers(transformers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Avalia o impacto e criticidade dos Transformadores."""
+        analyzed = []
+        for trafo in transformers:
+            frate = float(trafo.get("failure_rate", 0.0))
+            analyzed.append({
+                "transformer_id": trafo.get("external_id"),
+                "name": trafo.get("name"),
+                "failure_rate": frate
+            })
+        return sorted(analyzed, key=lambda x: x["failure_rate"], reverse=True)
