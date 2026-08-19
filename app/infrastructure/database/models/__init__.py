@@ -10,3 +10,6 @@ from .reliability_result_model import ReliabilityResultModel
 from .region_model import RegionModel
 from .bus_model import BusModel
 from .security_model import UserModel, RoleModel, PermissionModel
+from .import_job_model import ImportJobModel
+
+

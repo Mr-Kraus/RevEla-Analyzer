@@ -1,0 +1,36 @@
+25/03/2026 Elaboração do modelo ;;;;;;;;;;;;
+;;;;;;;;;;;;
+SERIES HIDROLOGICAS {Impacto das afluencias e da coordenacao hidrotermica} - 2005;;;;;;;;;;;;
+;;;;;;;;;;;;
+NUMERO DE SERIES;;;;;;;;;;;;
+<NSERI>;;;;;;;;;;;;
+2;;;;;;;;;;;;
+;;;;;;;;;;;;
+<PROBD>;;;;;;;;;;;;
+<VALOR>;;;;;;;;;;;;
+1;0.5;;;;;;;;;;;
+2;0.5;;;;;;;;;;;
+<\VALOR>;;;;;;;;;;;;
+;;;;;;;;;;;;
+NUMERO DE APROV/BACIAS;;;;;;;;;;;;
+<NBACI>;;;;;;;;;;;;
+1;;;;;;;;;;;;
+;;;;;;;;;;;;
+SERIE HIDROLOGICA 1 - 2025;;;;;;;;;;;;
+<SERIE>;;;;;;;;;;;;
+1;;;;;;;;;;;;
+APROV;JAN.;FEV.;MAR.;ABR.;MAI.;JUN.;JUL.;AGO.;SET.;OUT.;NOV.;DEZ.
+;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL
+<VALOR>;;;;;;;;;;;;
+1;24.85;24.85;24.85;23.92;23.88;23.88;17.16;16.81;16.81;38.23;38.77;38.77
+<\VALOR>;;;;;;;;;;;;
+;;;;;;;;;;;;
+SERIE HIDROLOGICA 2 - 2024;;;;;;;;;;;;
+<SERIE>;;;;;;;;;;;;
+2;;;;;;;;;;;;
+APROV;JAN.;FEV.;MAR.;ABR.;MAI.;JUN.;JUL.;AGO.;SET.;OUT.;NOV.;DEZ.
+;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL;ANUAL
+<VALOR>;;;;;;;;;;;;
+1;30.24;43.33;26.39;26.33;28.63;18.37;14.42;12.11;16.35;18.69;28.07;31.85
+<\VALOR>;;;;;;;;;;;;
+<FIM>;;;;;;;;;;;;

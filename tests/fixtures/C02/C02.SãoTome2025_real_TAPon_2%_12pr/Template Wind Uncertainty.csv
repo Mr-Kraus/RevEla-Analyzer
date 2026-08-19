@@ -1,0 +1,23 @@
+﻿Wind uncertatinties cdf;;
+;;
+Number of intervals;;
+<NINT>;;
+0;;
+;;
+Intervals: Start Hour < Hour <= End Hour;;
+ID;Start (Hour);End (Hour)
+<INTDUR>;;
+1;0;24
+;;
+Number of quantiles;;
+<NQUANT>;;
+0;;
+;;
+CDF data;;
+<CDF>;;
+<INT>;;
+0;;
+Uncert. (pu);Cum. Prob.;
+<VAL>;;
+<\VAL>;;
+<FIM>;;

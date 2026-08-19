@@ -1,0 +1,26 @@
+System:;C02.SãoTome2025_real_TAPon_2%_12pr
+Study Type:;Static Reserve
+System Configuration:;Main System with Transmission Network
+Cross Entropy:;CSettings::CSimulacao::CCrossEntropy::CrossEntropy
+Electric Vehicles:;0
+Load Shifting:;0
+Interruption Costs:;0
+Correlated Time-Series:;0
+Wind Uncertainty Model:;Persistence
+Solar Uncertainty Model:;Persistence
+Hydro Rollover (Model CDL):;1
+Pumping (Model CDL):;1
+Arbitrage Pumping (Model CDL):;1
+Generators Maintenance:;0
+Generators Forced Outage Rate:;1
+Power Flow:;DC
+Interconnections Forced Outage Rate:;1
+Interconnections Maintenance:;0
+Transmission Lines Maintenance:;0
+Net Load Composition:;Eol+Sol+Out+
+Unit Commitment:;Stacking
+Interconnections Emergency Capacity:;0
+Arbitrage pumping mode:;Individual
+Replacement reserve:;Non-synced only
+Critical case:;0
+CMU Data:;0

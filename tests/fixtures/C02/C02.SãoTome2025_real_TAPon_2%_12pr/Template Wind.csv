@@ -1,0 +1,42 @@
+SERIES EOLICAS;;
+;;
+NUMERO DE SERIES;;
+<NSERI>;;
+0;;
+;;
+<PROBD>;;
+<VALOR>;;
+<\VALOR>;;
+;;
+NUMERO DE REGIOES;;
+<REGID>;;
+0;;
+;;
+NUME NOME;NOME;
+<VALOR>;;
+<\VALOR>;;
+;;
+<SERIE>;;
+0;;
+<RID>;;
+1;2;3
+</RID>;;
+<VALOR>;;
+<\VALOR>;;
+;;
+<SERIE>;;
+2;;
+<RID>;;
+1;2;3
+<\RID>;;
+<VALOR>;;
+<\VALOR>;;
+;;
+<SERIE>;;
+3;;
+<RID>;;
+1;2;3
+<\RID>;;
+<VALOR>;;
+<\VALOR>;;
+<FIM>;;
