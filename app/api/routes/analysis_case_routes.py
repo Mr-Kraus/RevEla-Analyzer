@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import uuid
+from app.infrastructure.analytical_repositories.analytical_global_repository import AnalyticalGlobalRepository
 
 from app.api.dependencies.db_dependency import get_db
 from app.api.dependencies.auth_dependency import get_current_user
@@ -57,5 +58,57 @@ def get_simulation_topology(
             data=topology_data,
             message="Topologia da rede carregada com sucesso."
         )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@router.get("/{simulation_id}/transmission", response_model=APIResponse)
+def get_case_transmission_analysis(
+    simulation_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Retorna o inventário detalhado e indicadores de transmissão (Linhas e Transformadores).
+    """
+    repo = AnalyticalTopologyRepository(db)
+    try:
+        data = repo.get_transmission_details(simulation_id)
+        return APIResponse(
+            success=True,
+            data=data,
+            message="Análise de transmissão carregada com sucesso."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/{simulation_id}/generation", response_model=APIResponse)
+def get_case_generation_analysis(
+    simulation_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Retorna o inventário detalhado e indicadores do Parque Gerador.
+    """
+    repo = AnalyticalTopologyRepository(db)
+    try:
+        data = repo.get_generation_details(simulation_id)
+        return APIResponse(
+            success=True,
+            data=data,
+            message="Análise de geração carregada com sucesso."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+@router.get("/{case_id}/global", response_model=APIResponse)
+def get_case_global_analysis(
+    case_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    repo = AnalyticalGlobalRepository(db)
+    try:
+        data = repo.get_global_metrics(case_id)
+        return APIResponse(success=True, data=data, message="Análise global carregada.")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

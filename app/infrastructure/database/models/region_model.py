@@ -13,6 +13,7 @@ class RegionModel(Base):
     
     external_id: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
+    alias: Mapped[str] = mapped_column(String(100), nullable=True)
 
     system = relationship("SystemModel", back_populates="regions")
     buses = relationship("BusModel", back_populates="region")

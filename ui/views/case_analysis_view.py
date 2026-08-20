@@ -4,8 +4,8 @@ from PyQt6.QtCore import Qt
 from ui.viewmodels.case_analysis_viewmodel import CaseAnalysisViewModel
 from ui.views.tab_summary_view import TabSummaryView
 from ui.views.tab_topology_view import TabTopologyView
-
-
+from ui.views.tab_transmission_view import TabTransmissionView
+from ui.views.tab_generation_view import TabGenerationView
 
 
 
@@ -56,16 +56,18 @@ class CaseAnalysisView(QWidget):
         
         # 2. Instanciamos os placeholders para as próximas abas
         self.tab_topology = TabTopologyView()
-        self.tab_generation = QWidget()
-        self.tab_transmission = QWidget()
+        self.tab_generation = TabGenerationView()
+        self.tabs.addTab(self.tab_generation, "🏭 Geração")
+        self.tab_transmission = TabTransmissionView()
+        self.tabs.addTab(self.tab_transmission, "⚡ Transmissão")
         
         # Textos temporários para as abas vazias
         QVBoxLayout(self.tab_topology).addWidget(QLabel("Aba de Topologia (Grafo de Rede) - Em construção"))
         
         # 3. Adicionamos tudo no QTabWidget
         self.tabs.addTab(self.tab_summary, "📊 Resumo Executivo")
-        self.tabs.addTab(self.tab_generation, "⚡ Geração")
-        self.tabs.addTab(self.tab_transmission, "🔌 Transmissão")
+        self.tabs.addTab(self.tab_generation, "🏭 Geração")
+        self.tabs.addTab(self.tab_transmission, "⚡ Transmissão")
         self.tabs.addTab(self.tab_topology, "🕸️ Topologia (Grafo)")
 
         layout.addWidget(self.tabs)
@@ -118,10 +120,21 @@ class CaseAnalysisView(QWidget):
         """Lazy Loading: Só carrega os dados pesados se a aba for aberta."""
         if hasattr(self, 'current_case_id') and self.current_case_id:
             
-            # Se a aba clicada for a de Topologia
+            # Se a aba clicada for a de Topologia!
             if self.tabs.currentWidget() == self.tab_topology:
                 
                 # Verifica se já carregou para não ficar recarregando à toa
                 if getattr(self.tab_topology, 'loaded_case_id', None) != self.current_case_id:
                     self.tab_topology.load_case(self.current_case_id)
-                    self.tab_topology.loaded_case_id = self.current_case_id
+
+            # Se a aba clicada for a de Transmissão!
+            elif self.tabs.currentWidget() == self.tab_transmission:
+                if getattr(self.tab_transmission, 'loaded_case_id', None) != self.current_case_id:
+                    self.tab_transmission.load_case(self.current_case_id)
+                    self.tab_transmission.loaded_case_id = self.current_case_id
+
+            # Se a aba clicada foi a de Geração!
+            elif self.tabs.currentWidget() == self.tab_generation:
+                if getattr(self.tab_generation, 'loaded_case_id', None) != self.current_case_id:
+                    self.tab_generation.load_case(self.current_case_id)
+                    self.tab_generation.loaded_case_id = self.current_case_id

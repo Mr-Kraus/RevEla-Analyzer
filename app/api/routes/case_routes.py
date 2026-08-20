@@ -1,3 +1,6 @@
+from pydantic import BaseModel
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
@@ -87,3 +90,60 @@ def delete_case(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao excluir caso: {str(e)}")
+    
+class CaseUpdateSchema(BaseModel):
+    display_name: str
+
+class RegionAliasSchema(BaseModel):
+    id: uuid.UUID
+    alias: Optional[str] = None
+
+# 1. Atualizar o nome do Caso
+@router.patch("/{case_id}", response_model=APIResponse)
+def update_case_name(
+    case_id: uuid.UUID,
+    payload: CaseUpdateSchema,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    case_model = db.get(CaseModel, case_id)
+    if not case_model:
+        raise HTTPException(status_code=404, detail="Caso não encontrado.")
+    
+    case_model.display_name = payload.display_name
+    db.commit()
+    return APIResponse(success=True, data={"id": str(case_id)}, message="Nome do caso atualizado.")
+
+# 2. Listar Regiões de um Caso
+@router.get("/{case_id}/regions", response_model=APIResponse)
+def get_case_regions(
+    case_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    stmt = (
+        select(RegionModel.id, RegionModel.external_id, RegionModel.name, RegionModel.alias)
+        .join(SystemModel, RegionModel.system_id == SystemModel.id)
+        .where(SystemModel.case_id == case_id)
+    )
+    results = db.execute(stmt).all()
+    regions = [
+        {"id": str(r.id), "external_id": r.external_id, "name": r.name, "alias": r.alias or ""}
+        for r in results
+    ]
+    return APIResponse(success=True, data=regions, message="Regiões carregadas.")
+
+# 3. Atualizar Apelidos das Regiões em Lote
+@router.put("/{case_id}/regions", response_model=APIResponse)
+def update_region_aliases(
+    case_id: uuid.UUID,
+    payload: List[RegionAliasSchema],
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    for item in payload:
+        region = db.get(RegionModel, item.id)
+        if region:
+            region.alias = item.alias.strip() if item.alias else None
+    db.commit()
+    return APIResponse(success=True, data={}, message="Apelidos das regiões atualizados.")
