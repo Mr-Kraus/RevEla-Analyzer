@@ -6,7 +6,7 @@ from app.api.dependencies.db_dependency import get_db
 from app.api.dependencies.auth_dependency import get_current_user
 from app.infrastructure.database.models.security_model import UserModel
 from app.api.schemas.base_schema import APIResponse
-
+from app.infrastructure.analytical_repositories.analytical_topology_repository import AnalyticalTopologyRepository
 from app.infrastructure.analytical_repositories.analytical_indicator_repository import AnalyticalIndicatorRepository
 from app.application.use_cases.analytical.get_case_analysis_use_case import GetCaseAnalysisUseCase
 
@@ -46,15 +46,12 @@ def get_simulation_topology(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user)
 ):
-    """
-    Retorna os nós (barras) e arestas (linhas de transmissão) para o Grafo Interativo da Aba 4.
-    """
-    repo = AnalyticalIndicatorRepository(db)
+    """Retorna os nós e arestas reais para a Aba 4."""
+    # CORREÇÃO: Chamando o repositório de Topologia (que possui a tabela de equipamentos)
+    repo = AnalyticalTopologyRepository(db)
     
     try:
-        # Busca os dados de nós e arestas diretamente do repositório
         topology_data = repo.get_topology(simulation_id)
-        
         return APIResponse(
             success=True,
             data=topology_data,

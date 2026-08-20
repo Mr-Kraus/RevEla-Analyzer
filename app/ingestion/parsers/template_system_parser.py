@@ -68,18 +68,27 @@ class TemplateSystemParser(BaseParser):
 
     def _extract_and_deduplicate_headers(self, buffer: List[str]) -> List[str]:
         """
-        Varre o buffer de cima para baixo e acha a linha de cabeçalho principal
-        (aquela cuja primeira coluna contém letras, como 'ID' ou 'CLAS', ignorando a linha de unidades).
+        Varre o buffer para achar a linha de cabeçalho principal.
+        Procura ativamente por 'ID' ou 'CLAS' na primeira coluna para não ser
+        enganado por variáveis perdidas no arquivo (ex: 'SIT', 'PRP').
         """
         raw_headers = []
         for line in buffer:
             parts = line.split(';')
-            first_col = parts[0].strip()
+            first_col = parts[0].strip().upper()
             
-            # A linha de cabeçalho começa com texto. A linha de unidades (geralmente) começa vazia.
-            if first_col and any(c.isalpha() for c in first_col) and not line.startswith('<'):
+            # Ancoragem forte: O cabeçalho real sempre começa com ID ou CLAS
+            if first_col in ['ID', 'CLAS', 'NUM', 'NODE'] and not line.startswith('<'):
                 raw_headers = [p.strip() for p in parts]
                 break
+
+        # Fallback de segurança (se não achar ID, pega a primeira linha com muitas colunas)
+        if not raw_headers:
+            for line in buffer:
+                parts = line.split(';')
+                if len([p for p in parts if p.strip()]) > 3 and not line.startswith('<'):
+                    raw_headers = [p.strip() for p in parts]
+                    break
 
         seen = {}
         deduped = []

@@ -63,3 +63,27 @@ def get_case_simulations(
     ]
     
     return APIResponse(success=True, data=data, message="Simulações recuperadas.")
+
+@router.delete("/{case_id}", response_model=APIResponse)
+def delete_case(
+    case_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Exclui um caso e todos os seus dados associados (Topologia, Resultados, Arquivos) em cascata.
+    """
+    case_service = CaseService(db)
+    
+    try:
+        success = case_service.delete_case(case_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Caso não encontrado.")
+            
+        return APIResponse(
+            success=True,
+            data={"deleted_case_id": str(case_id)},
+            message="Caso excluído com sucesso."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao excluir caso: {str(e)}")

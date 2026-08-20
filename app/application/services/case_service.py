@@ -31,3 +31,17 @@ class CaseService:
         """Retorna todos os casos cadastrados."""
         stmt = select(CaseModel).order_by(CaseModel.external_name)
         return list(self.db.execute(stmt).scalars().all())
+    
+    def delete_case(self, case_id: uuid.UUID) -> bool:
+        """
+        Remove o modelo CaseModel do banco de dados.
+        O comportamento de CASCADE do SQLAlchemy/PostgreSQL se encarregará 
+        de deletar simulações, sistemas, barras, linhas e resultados associados.
+        """
+        case_model = self.db.get(CaseModel, case_id)
+        if not case_model:
+            return False
+            
+        self.db.delete(case_model)
+        self.db.commit()
+        return True

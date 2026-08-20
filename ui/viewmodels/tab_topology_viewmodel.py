@@ -10,18 +10,22 @@ class TabTopologyViewModel(QObject):
         self.api_client = APIClient()
 
     def load_topology(self, case_id: str):
-        # Tenta buscar a topologia no backend
-        self._worker = self.api_client.make_request_async("GET", f"/cases/{case_id}/topology")
+        url = f"/analysis/case/{case_id}/topology"
+        print(f"DEBUG API: Iniciando GET para a URL -> {url}")
+        
+        self._worker = self.api_client.make_request_async("GET", url)
         self._worker.finished.connect(self._on_topology_loaded)
         self._worker.start()
 
     def _on_topology_loaded(self, response):
+        print(f"DEBUG API: Resposta recebida. Status Code: {response.status_code}")
+        
         if response.status_code == 200:
             data = response.json().get("data", {})
             self.topology_ready.emit(data)
         else:
-            # FALLBACK: Se o backend não tiver essa rota ainda, carrega uma rede de demonstração
-            print("⚠️ Rota de topologia não encontrada no backend. Carregando rede de demonstração.")
+            print(f"DEBUG API: Texto do erro retornado pelo backend -> {response.text}")
+            print("Carregando rede de demonstracao (Fallback).")
             dummy_data = self._generate_dummy_topology()
             self.topology_ready.emit(dummy_data)
 

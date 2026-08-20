@@ -5,7 +5,8 @@ import os
 class CasesViewModel(QObject):
     cases_loaded = pyqtSignal(list)
     error_occurred = pyqtSignal(str)
-    
+    case_deleted = pyqtSignal(str)
+
     # Sinais para o fluxo de importação
     import_started = pyqtSignal()
     import_success = pyqtSignal(str)
@@ -69,3 +70,20 @@ class CasesViewModel(QObject):
             self.load_cases() # Atualiza a tabela
         else:
             self.import_failed.emit("Erro durante o processamento dos CSVs no servidor.")
+
+    # ==========================================
+    # FLUXO DE EXCLUSÃO
+    # ==========================================
+    def delete_case(self, case_id: str):
+        """Dispara a requisição DELETE para a API de forma assíncrona."""
+        self._del_worker = self.api_client.make_request_async("DELETE", f"/cases/{case_id}")
+        self._del_worker.finished.connect(lambda resp: self._on_case_deleted(resp, case_id))
+        self._del_worker.start()
+
+    def _on_case_deleted(self, response, case_id: str):
+        if response.status_code == 200:
+            self.case_deleted.emit(case_id)
+            self.load_cases()  # Recarrega a lista atualizada automaticamente
+        else:
+            msg = f"Falha ao excluir o caso. Status: {response.status_code}"
+            self.error_occurred.emit(msg)

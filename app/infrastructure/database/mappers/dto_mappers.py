@@ -1,14 +1,16 @@
 import uuid
 import math
 from typing import Dict, Any
+import logging
+
 from app.domain.entities.reliability_result import ReliabilityResult
-# Assumindo que você tem entidades Region e Bus definidas no domínio
-# from app.domain.entities.system_topology import Region, Bus
 from app.infrastructure.database.models.equipment_model import TransmissionLineModel, TransformerModel
 from app.infrastructure.database.models.system_model import SystemModel
 from app.infrastructure.database.models.region_model import RegionModel
 from app.infrastructure.database.models.bus_model import BusModel
 from app.infrastructure.database.models.equipment_model import GeneratorModel
+
+logger = logging.getLogger(__name__)
 
 class ReliabilityResultDtoMapper:
     """Converte o Canonical DTO de Índices em Entidade de Domínio."""
@@ -21,7 +23,6 @@ class ReliabilityResultDtoMapper:
         bus_ext_id: str = None
     ) -> ReliabilityResult:
         
-        # Função interna de segurança: Banco de dados relacional odeia 'NaN', converteremos para 0.0
         def clean_nan(val):
             if val is None or math.isnan(val):
                 return 0.0
@@ -46,7 +47,6 @@ class SystemTopologyMapper:
     
     @staticmethod
     def to_orm_models(case_id: uuid.UUID, simulation_run_id: uuid.UUID, topology_dto: Dict[str, Any]) -> SystemModel:
-        # 1. Cria a Raiz
         system_model = SystemModel(
             id=uuid.uuid4(),
             case_id=case_id,
@@ -55,7 +55,6 @@ class SystemTopologyMapper:
             nominal_load_mw=0.0
         )
         
-        # 2. Cria as Regiões
         region_models = {
             reg["external_id"]: RegionModel(
                 id=uuid.uuid4(),
@@ -65,7 +64,6 @@ class SystemTopologyMapper:
         }
         system_model.regions = list(region_models.values())
         
-        # 3. Cria as Barras
         bus_models = {}
         for bus in topology_dto.get("buses", []):
             reg_ext_id = bus["region_external_id"]
@@ -73,62 +71,83 @@ class SystemTopologyMapper:
             
             b_model = BusModel(
                 id=uuid.uuid4(),
-                external_id=bus["external_id"],
+                external_id=str(bus["external_id"]).strip(),
                 name=bus["name"],
                 base_kv=bus["voltage_kv"],
                 region_id=region_id
             )
-            bus_models[bus["external_id"]] = b_model
+            bus_models[str(bus["external_id"]).strip()] = b_model
             system_model.buses.append(b_model)
             
-        # 4. Cria os Geradores (Classes de Geração mapeadas temporariamente como Geradores genéricos)
         for gen in topology_dto.get("generation_classes", []):
             system_model.generators.append(
                 GeneratorModel(
                     id=uuid.uuid4(),
-                    external_id=gen["external_id"],
+                    external_id=str(gen["external_id"]).strip(),
                     name=gen["name"],
                     nominal_capacity_mw=gen["nominal_capacity_mw"],
                     failure_rate_percent=gen["failure_rate_percent"],
                     repair_time_hours=gen["repair_time_hours"]
                 )
             )
-        # 5. Mapeia Linhas de Transmissão vinculando as Barras reais (From/To)
+
+        # 5. Mapeia Linhas de Transmissão passando OS OBJETOS (from_bus)
+        # para o SQLAlchemy criar o grafo de dependências corretamente!
         for line in topology_dto.get("transmission_lines", []):
-            from_bus = bus_models.get(line["from_bus_ext_id"])
-            to_bus = bus_models.get(line["to_bus_ext_id"])
+            from_ext = str(line["from_bus_ext_id"]).strip()
+            to_ext = str(line["to_bus_ext_id"]).strip()
+            
+            from_bus = bus_models.get(from_ext)
+            to_bus = bus_models.get(to_ext)
             
             if from_bus and to_bus:
                 system_model.transmission_lines.append(
                     TransmissionLineModel(
                         id=uuid.uuid4(),
-                        external_id=line["external_id"],
+                        external_id=str(line["external_id"]).strip(),
                         name=line["name"],
-                        from_bus_id=from_bus.id,
-                        to_bus_id=to_bus.id,
+                        from_bus=from_bus, # <-- MÁGICA: Ao invés de ID, passa a classe!
+                        to_bus=to_bus,     # <-- O SQLAlchemy força salvar o Bus antes!
                         r_pu=line.get("r_pu", 0.0),
                         x_pu=line.get("x_pu", 0.0),
-                        capacity_mva=line.get("capacity_mva", 0.0)
+                        capacity_mva=line.get("capacity_mva", 0.0),
+                        failure_rate=line.get("failure_rate", 0.0),
+                        repair_time=line.get("repair_time", 0.0)
                     )
                 )
+            else:
+                logger.warning(
+                    f"Ingestão ignorou a Linha {line.get('external_id')} "
+                    f"(From Bus: {from_ext}, To Bus: {to_ext}): Barra(s) não encontrada(s) no sistema."
+                )
 
-        # 6. Mapeia Transformadores vinculando as Barras reais (From/To)
+        # 6. Mapeia Transformadores passando OS OBJETOS
         for trafo in topology_dto.get("transformers", []):
-            from_bus = bus_models.get(trafo["from_bus_ext_id"])
-            to_bus = bus_models.get(trafo["to_bus_ext_id"])
+            from_ext = str(trafo["from_bus_ext_id"]).strip()
+            to_ext = str(trafo["to_bus_ext_id"]).strip()
+            
+            from_bus = bus_models.get(from_ext)
+            to_bus = bus_models.get(to_ext)
             
             if from_bus and to_bus:
                 system_model.transformers.append(
                     TransformerModel(
                         id=uuid.uuid4(),
-                        external_id=trafo["external_id"],
+                        external_id=str(trafo["external_id"]).strip(),
                         name=trafo["name"],
-                        from_bus_id=from_bus.id,
-                        to_bus_id=to_bus.id,
+                        from_bus=from_bus, # <-- MÁGICA
+                        to_bus=to_bus,
                         r_pu=trafo.get("r_pu", 0.0),
                         x_pu=trafo.get("x_pu", 0.0),
-                        capacity_mva=trafo.get("capacity_mva", 0.0)
+                        capacity_mva=trafo.get("capacity_mva", 0.0),
+                        failure_rate=trafo.get("failure_rate", 0.0),
+                        repair_time=trafo.get("repair_time", 0.0)
                     )
-                )    
-        # Retorna a raiz populada. O cascade="all" do SQLAlchemy fará o resto!
+                )
+            else:
+                logger.warning(
+                    f"Ingestão ignorou o Trafo {trafo.get('external_id')} "
+                    f"(From Bus: {from_ext}, To Bus: {to_ext}): Barra(s) não encontrada(s) no sistema."
+                )
+                    
         return system_model

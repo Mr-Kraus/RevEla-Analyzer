@@ -73,9 +73,8 @@ class CaseAnalysisView(QWidget):
     def setup_connections(self):
         self.viewmodel.cases_loaded.connect(self.populate_cases)
         self.viewmodel.error_occurred.connect(self.show_error)
-        
-        # Quando o usuário escolhe um caso no Dropdown
         self.combo_cases.currentIndexChanged.connect(self.on_case_selected)
+        self.tabs.currentChanged.connect(self.on_tab_changed)
 
     def load_data(self):
         """Chamado pela MainWindow ao abrir esta seção"""
@@ -99,9 +98,30 @@ class CaseAnalysisView(QWidget):
             selected_text = self.combo_cases.currentText()
             case_id = self.case_mapping.get(selected_text)
             if case_id:
-                # Avisa a Aba de Resumo para carregar os dados!
+                self.current_case_id = case_id # Guarda o ID do caso atual
+                
+                # Carrega o Resumo imediatamente (é leve)
                 self.tab_summary.load_case(case_id)
-                self.tab_topology.load_case(case_id)
+                
+                # Reseta o status da topologia, mas NÃO CARREGA ainda
+                self.tab_topology.loaded_case_id = None 
+                
+                # Se por acaso ele já estiver na aba de topologia ao trocar o caso, carrega.
+                if self.tabs.currentWidget() == self.tab_topology:
+                    self.tab_topology.load_case(case_id)
+                    self.tab_topology.loaded_case_id = case_id
 
     def show_error(self, msg):
         QMessageBox.warning(self, "Erro", msg)
+
+    def on_tab_changed(self, index):
+        """Lazy Loading: Só carrega os dados pesados se a aba for aberta."""
+        if hasattr(self, 'current_case_id') and self.current_case_id:
+            
+            # Se a aba clicada for a de Topologia
+            if self.tabs.currentWidget() == self.tab_topology:
+                
+                # Verifica se já carregou para não ficar recarregando à toa
+                if getattr(self.tab_topology, 'loaded_case_id', None) != self.current_case_id:
+                    self.tab_topology.load_case(self.current_case_id)
+                    self.tab_topology.loaded_case_id = self.current_case_id
