@@ -22,6 +22,7 @@ class RankingItemDTO(BaseModel):
     rank_position: int
     element_id: str
     element_name: str
+    region_name: Optional[str] = "Região Principal"
     value: float
 
 class RankingDTO(BaseModel):

@@ -10,7 +10,7 @@ from app.api.schemas.import_schema import ImportJobResponse
 from app.application.services.import_service import ImportService
 from app.infrastructure.database.models.import_job_model import ImportJobModel
 from sqlalchemy import select
-
+from app.api.routes.analysis_case_routes import router as analytical_router
 router = APIRouter(prefix="/cases", tags=["Ingestion & Import"])
 
 @router.post("/{case_id}/import", response_model=APIResponse[ImportJobResponse])

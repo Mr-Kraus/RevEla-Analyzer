@@ -32,12 +32,7 @@ class AnalyticalIndicatorRepository:
         )
         return list(self.session.execute(stmt).scalars().all())
 
-    def get_top_buses_by_indicator(self, simulation_id: uuid.UUID, indicator_column: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Ranking Engine Base: Retorna as piores barras baseadas em um indicador específico (ex: 'epns').
-        Cruza os dados com a tabela BusModel para trazer o nome/external_id da barra.
-        """
-        # Garante que a coluna solicitada existe no modelo para evitar SQL Injection
+    def get_top_buses_by_indicator(self, simulation_id: uuid.UUID, indicator_column: str, limit: int = 1500) -> List[Dict[str, Any]]:
         if not hasattr(ReliabilityResultModel, indicator_column):
             raise ValueError(f"Indicador '{indicator_column}' não existe no modelo.")
 
@@ -46,26 +41,33 @@ class AnalyticalIndicatorRepository:
         stmt = (
             select(
                 BusModel.external_id,
-                BusModel.name,
+                BusModel.name.label("bus_name"),
+                RegionModel.name.label("region_name"),
                 column_attr.label("indicator_value")
             )
+            .distinct()
+            .select_from(ReliabilityResultModel)
             .join(BusModel, ReliabilityResultModel.bus_external_id == BusModel.external_id)
+            .outerjoin(RegionModel, BusModel.region_id == RegionModel.id)
             .where(
                 ReliabilityResultModel.simulation_run_id == simulation_id,
-                ReliabilityResultModel.is_global == False
+                ReliabilityResultModel.is_global == False,
+                column_attr > 0
             )
             .order_by(desc(column_attr))
-            .limit(limit)
         )
         
+        if limit:
+            stmt = stmt.limit(limit)
+            
         results = self.session.execute(stmt).all()
         
-        # Converte as tuplas retornadas pelo SQLAlchemy em dicionários amigáveis
         return [
             {
                 "bus_external_id": row.external_id,
-                "bus_name": row.name,
-                "value": row.indicator_value
+                "bus_name": row.bus_name,
+                "region_name": row.region_name if row.region_name else "Região Desconhecida",
+                "value": float(row.indicator_value)
             }
             for row in results
         ]

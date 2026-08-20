@@ -22,8 +22,8 @@ class CompareCasesUseCase:
         global_delta_raw = ComparisonEngine.compare_global_indicators(dict_a, dict_b, [indicator])
         
         # 3. Busca e compara Barras
-        buses_a = self.repository.get_top_buses_by_indicator(base_sim_id, indicator, limit=1000)
-        buses_b = self.repository.get_top_buses_by_indicator(target_sim_id, indicator, limit=1000)
+        buses_a = self.repository.get_top_buses_by_indicator(base_sim_id, indicator, limit=1500)
+        buses_b = self.repository.get_top_buses_by_indicator(target_sim_id, indicator, limit=1500)
         
         bus_comparisons = ComparisonEngine.compare_buses(buses_a, buses_b, indicator)
 

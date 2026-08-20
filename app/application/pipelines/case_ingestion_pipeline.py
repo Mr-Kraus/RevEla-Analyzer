@@ -52,15 +52,22 @@ class CaseIngestionPipeline:
             # =====================================================================
             # PASSO 2: EXTRAÇÃO E NORMALIZAÇÃO DOS DADOS (Parsers e Normalizers)
             # =====================================================================
-            # Lógica de Parsing (Leitura dos arquivos físicos em raw DTOs)
-            raw_settings = TemplateSettingsParser().parse(case_folder / "Template Settings.csv")
-            raw_system = TemplateSystemParser().parse(case_folder / "Template System.csv")
+            # Busca dinâmica pelo arquivo de Settings
+            settings_files = list(case_folder.rglob("Template Settings.csv"))
+            if not settings_files:
+                raise FileNotFoundError("Arquivo 'Template Settings.csv' não encontrado em nenhuma subpasta.")
+            raw_settings = TemplateSettingsParser().parse(settings_files[0])
+
+            # Busca dinâmica pelo arquivo de System (Topologia)
+            system_files = list(case_folder.rglob("Template System.csv"))
+            if not system_files:
+                raise FileNotFoundError("Arquivo 'Template System.csv' não encontrado em nenhuma subpasta.")
+            raw_system = TemplateSystemParser().parse(system_files[0])
             
-            # Busca dinâmica pelo arquivo de resultados de confiabilidade (suportando subpastas como 'Results_STA')
+            # Busca dinâmica pelo arquivo de resultados de confiabilidade (já estava assim)
             results_files = list(case_folder.rglob("*Final Reliability Indices.csv"))
             if not results_files:
                 raise FileNotFoundError("Arquivo 'Final Reliability Indices.csv' não encontrado no caso.")
-                
             raw_results = ReliabilityIndicesParser().parse(results_files[0])
             
             # Lógica de Normalização (Conversão de raw DTOs para Canonical DTOs)

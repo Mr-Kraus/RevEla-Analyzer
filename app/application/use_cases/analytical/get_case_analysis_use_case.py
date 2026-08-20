@@ -13,7 +13,7 @@ class GetCaseAnalysisUseCase:
 
     def execute(self, simulation_id: uuid.UUID, indicator: str = "epns", case_name: str = "Unknown Case", filters: AnalyticalFilterDTO = None) -> CaseAnalysisDTO:
         # 1. Busca os dados granulares. O repo retorna dicts com a chave padronizada 'value' para a métrica.
-        bus_results_raw = self.repository.get_top_buses_by_indicator(simulation_id, indicator, limit=1000)
+        bus_results_raw = self.repository.get_top_buses_by_indicator(simulation_id, indicator, limit=1500)
         
         # 2. Processa Agregações (Regiões). Renomeia 'value' para o nome do indicador para o agregador.
         # Mas neste ponto não temos a region_external_id no retorno do repositório atual, então vamos pular
@@ -21,16 +21,17 @@ class GetCaseAnalysisUseCase:
         region_aggregations = {}
         
         # 3. Processa Ranking (Barras mais críticas) usando a chave genérica 'value'
-        top_buses_raw = RankingEngine.rank_critical_buses(bus_results_raw, indicator="value", top_n=10)
+        top_buses_raw = RankingEngine.rank_critical_buses(bus_results_raw, indicator="value", top_n=1500)
         
         # 4. Converte para DTO
         ranking_items = [
             RankingItemDTO(
-                rank_position=tb["rank_position"],
-                element_id=tb["bus_external_id"],
-                element_name=tb["bus_name"],
-                value=tb["value"]  # <-- CORREÇÃO: Usar a chave genérica 'value' que veio do repositório
-            ) for tb in top_buses_raw
+                rank_position=tb.get("rank_position", idx + 1),
+                element_id=tb.get("bus_external_id", tb.get("element_id", "")),
+                element_name=tb.get("bus_name", tb.get("element_name", "")),
+                region_name=tb.get("region_name", "Região Principal"), 
+                value=float(tb.get("value", 0.0))
+            ) for idx, tb in enumerate(top_buses_raw)
         ]
 
         ranking_dto = RankingDTO(indicator=indicator, top_elements=ranking_items)

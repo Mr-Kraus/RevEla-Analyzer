@@ -39,3 +39,26 @@ def get_case_analysis(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.get("/{simulation_id}/topology", response_model=APIResponse)
+def get_simulation_topology(
+    simulation_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Retorna os nós (barras) e arestas (linhas de transmissão) para o Grafo Interativo da Aba 4.
+    """
+    repo = AnalyticalIndicatorRepository(db)
+    
+    try:
+        # Busca os dados de nós e arestas diretamente do repositório
+        topology_data = repo.get_topology(simulation_id)
+        
+        return APIResponse(
+            success=True,
+            data=topology_data,
+            message="Topologia da rede carregada com sucesso."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

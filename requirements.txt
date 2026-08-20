@@ -1,0 +1,27 @@
+# ==========================================
+# RevEla Analyzer - Dependências do Projeto
+# ==========================================
+
+# --- API REST e Servidor (Milestone 04) ---
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# --- Banco de Dados e ORM (Milestones 01 e 04) ---
+SQLAlchemy>=2.0.0
+alembic>=1.11.0
+psycopg[binary]>=3.1.0
+
+# --- Segurança e Autenticação (Milestone 04) ---
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+python-multipart>=0.0.6
+
+# --- Processamento de Dados (Milestones 02 e 03) ---
+pandas>=2.0.0
+numpy>=1.24.0
+
+# --- Cliente e Interface Gráfica (Milestone 05 - Preparação) ---
+requests>=2.31.0
+PyQt6>=6.5.0

@@ -51,3 +51,38 @@ class AnalyticalTopologyRepository:
         stmt = select(TransformerModel).where(TransformerModel.system_id == sys_id)
         results = self.session.execute(stmt).scalars().all()
         return [{"external_id": t.external_id, "name": t.name, "failure_rate": float(t.failure_rate or 0)} for t in results]
+    
+
+    def get_topology(self, simulation_id: uuid.UUID) -> dict:
+        """
+        Retorna nós e arestas para renderização no PyVis/PyQt6.
+        """
+        # 1. Busca as barras associadas a esta simulação ou caso
+        stmt_buses = (
+            select(BusModel.external_id, BusModel.name, RegionModel.name.label("region_name"))
+            .select_from(BusModel)
+            .outerjoin(RegionModel, BusModel.region_id == RegionModel.id)
+        )
+        buses_results = self.session.execute(stmt_buses).all()
+
+        nodes = []
+        for row in buses_results:
+            nodes.append({
+                "id": str(row.external_id),
+                "label": str(row.name),
+                "group": str(row.region_name) if row.region_name else "Geral"
+            })
+
+        # 2. Busca as linhas de transmissão (Se a sua tabela de linhas existir)
+        # Nota: Se ainda não tiver a tabela de linhas, deixe 'edges = []' por enquanto.
+        edges = []
+        # Exemplo se houver um BranchModel:
+        # branches = self.session.execute(select(BranchModel.from_bus_id, BranchModel.to_bus_id)).all()
+        # for b in branches:
+        #     edges.append({"from": str(b.from_bus_id), "to": str(b.to_bus_id)})
+
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
+

@@ -16,6 +16,7 @@ app.include_router(analysis_case_routes.router)
 app.include_router(analysis_compare_routes.router)
 
 
+
 @app.get("/")
 def root():
     return {"message": "RevEla Analyzer API está operante!"}
