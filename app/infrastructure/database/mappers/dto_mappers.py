@@ -20,7 +20,8 @@ class ReliabilityResultDtoMapper:
         simulation_run_id: uuid.UUID, 
         is_global: bool, 
         dto: Dict[str, Any], 
-        bus_ext_id: str = None
+        bus_ext_id: str = None,
+        region_name: str = None
     ) -> ReliabilityResult:
         
         def clean_nan(val):
@@ -33,6 +34,7 @@ class ReliabilityResultDtoMapper:
             simulation_run_id=simulation_run_id,
             is_global=is_global,
             bus_external_id=bus_ext_id,
+            region_name=region_name,
             lolp=clean_nan(dto.get("lolp", 0.0)),
             lole=clean_nan(dto.get("lole", 0.0)),
             epns=clean_nan(dto.get("epns", 0.0)),

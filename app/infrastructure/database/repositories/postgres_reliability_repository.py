@@ -15,6 +15,7 @@ class PostgresReliabilityRepository:
                 simulation_run_id=r.simulation_run_id,
                 is_global=r.is_global,
                 bus_external_id=r.bus_external_id,
+                region_name=r.region_name,
                 lolp=r.lolp,
                 lole=r.lole,
                 epns=r.epns,

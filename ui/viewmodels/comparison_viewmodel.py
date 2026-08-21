@@ -1,14 +1,16 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 from ui.services.api_client import APIClient
+import requests
 
 class ComparisonViewModel(QObject):
     cases_loaded = pyqtSignal(list)
-    comparison_ready = pyqtSignal(dict, dict) # Envia (Dados do Caso A, Dados do Caso B)
+    comparison_data_ready = pyqtSignal(dict) 
     error_occurred = pyqtSignal(str)
     is_loading = pyqtSignal(bool)
 
     def __init__(self):
         super().__init__()
+        self.api_url = "http://127.0.0.1:8000"
         self.api_client = APIClient()
         self.case_a_id = None
         self.case_b_id = None
@@ -78,3 +80,24 @@ class ComparisonViewModel(QObject):
     def _on_error(self, msg):
         self.is_loading.emit(False)
         self.error_occurred.emit(msg)
+
+    def fetch_multi_case_data(self, case_ids: list, granularity: str, element_id: str = "ALL"):
+        """Envia os IDs e a granularidade para a nova rota de BI do Backend."""
+        payload = {
+            "case_ids": case_ids,
+            "granularity": granularity,
+            "element_id": element_id
+        }
+        
+        try:
+            # Chama o endpoint que acabamos de criar no FastAPI
+            response = requests.post(f"{self.api_url}/analysis/multi-compare", json=payload)
+            
+            if response.status_code == 200:
+                # Dispara o JSON pronto para a Interface
+                self.comparison_data_ready.emit(response.json())
+            else:
+                self.error_occurred.emit(f"Erro na análise: {response.text}")
+                
+        except Exception as e:
+            self.error_occurred.emit(f"Erro de conexão: {str(e)}")

@@ -44,6 +44,8 @@ class PersistParsedDataUseCase:
             results_entities = []
             
             # Globais
+            # ... [código existente]
+            # Globais
             if "global_indices" in results_dto and results_dto["global_indices"]:
                 results_entities.append(
                     ReliabilityResultDtoMapper.to_domain(simulation_run_id, True, results_dto["global_indices"])
@@ -52,14 +54,38 @@ class PersistParsedDataUseCase:
             # Recupera a simulação atual para atualizar Anos e Tipo
             simulation_run = self.session.get(SimulationRunModel, simulation_run_id)
             if simulation_run:
-                # Variáveis corrigidas para os DTOs passados na função execute()
                 simulation_run.simulated_years = results_dto.get("simulated_years", 0)
                 simulation_run.analysis_type = settings_dto.get("analysis_type", "STA")
+            regioes_para_salvar = results_dto.get("region_indices", [])
+            logger.info("============== RASTREADOR: USE CASE ==============")
+            logger.info(f"Regiões recebidas para salvar no banco: {len(regioes_para_salvar)}")
+            logger.info("==================================================")
+            # =========================================================
+            # NOVA FASE: Por Região
+            # =========================================================
+            for region_res in results_dto.get("region_indices", []):
+                results_entities.append(
+                    ReliabilityResultDtoMapper.to_domain(
+                        simulation_run_id,                       # 1º: ID da simulação
+                        False,                                   # 2º: is_global
+                        region_res,                              # 3º: Os dados/métricas
+                        None,                                    # 4º: Barra (Nulo, pois é região)
+                        region_res.get("region_name")            # 5º: Região
+                    )
+                )
 
-            # Por Barra
+            # =========================================================
+            # FASE: Por Barra
+            # =========================================================
             for bus_res in results_dto.get("bus_indices", []):
                 results_entities.append(
-                    ReliabilityResultDtoMapper.to_domain(simulation_run_id, False, bus_res, bus_res.get("bus_external_id"))
+                    ReliabilityResultDtoMapper.to_domain(
+                        simulation_run_id,                       # 1º: ID da simulação
+                        False,                                   # 2º: is_global
+                        bus_res,                                 # 3º: Os dados/métricas
+                        bus_res.get("bus_external_id"),          # 4º: Barra
+                        None                                     # 5º: Região (Nulo, pois é barra)
+                    )
                 )
                 
             self.reliability_repo.save_all(results_entities)

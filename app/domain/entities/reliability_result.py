@@ -12,7 +12,7 @@ class ReliabilityResult(BaseModel):
     simulation_run_id: uuid.UUID
     is_global: bool
     bus_external_id: Optional[str] = None
-    
+    region_name: Optional[str] = None
     # Indicadores
     lolp: float
     lole: float

@@ -24,3 +24,4 @@ class RawReliabilityIndicesDTO(BaseModel):
     blocks: Dict[str, List[List[str]]]
     simulated_years: int = 0
     confidence_intervals: Dict[str, Any] = field(default_factory=dict)
+    regional_indices: dict = None

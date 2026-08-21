@@ -4,6 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 from sqlalchemy import JSON
+from typing import Optional
 
 class ReliabilityResultModel(Base):
     """Tabela para armazenar os indicadores de confiabilidade do M02."""
@@ -14,7 +15,7 @@ class ReliabilityResultModel(Base):
     confidence_intervals: Mapped[dict] = mapped_column(JSON, nullable=True)
     is_global: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     bus_external_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    
+    region_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     lolp: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     lole: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)

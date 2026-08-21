@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Any, Optional
 import uuid
 
+
 # --- 1. DTO de Indicador Base ---
 class IndicatorDTO(BaseModel):
     code: str
@@ -52,3 +53,17 @@ class ComparisonDTO(BaseModel):
     element_comparisons: List[Dict[str, Any]] = Field(
         description="Lista de deltas detalhados por elemento (ex: Barras). Formato livre por flexibilidade."
     )
+class MultiCompareRequestDTO(BaseModel):
+    case_ids: List[str]
+    granularity: str  # "GLOBAL", "REGION", "BUS"
+    element_id: Optional[str] = "ALL"  # "ALL" ou ID específico
+
+class MultiCompareElementDataDTO(BaseModel):
+    element_name: str
+    values_by_case: Dict[str, Dict[str, Optional[float]]] # { sim_id: { "LOLP": 0.01, "LOLE": 2.5 } }
+
+class MultiCompareResponseDTO(BaseModel):
+    indicators: List[str]
+    units: Dict[str, str]
+    granularity: str
+    elements: List[MultiCompareElementDataDTO]

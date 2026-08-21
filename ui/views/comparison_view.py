@@ -20,7 +20,9 @@ class ComparisonView(QWidget):
         self.viewmodel = ComparisonViewModel()
         self.settings = SettingsService.get_instance()
         self.cases_mapping = {}
-        self.current_data = {}  
+        self.current_data = {}
+        self.case_ids_cache = []
+        self.case_names_cache = []
         
         self.setup_ui()
         self.setup_connections()
@@ -171,6 +173,13 @@ class ComparisonView(QWidget):
         elif hasattr(self.viewmodel, 'cases_loaded'):
             self.viewmodel.cases_loaded.connect(self.populate_cases_list)
             
+        # === CORREÇÃO CRÍTICA AQUI: Conectando a resposta do ViewModel à View ===
+        if hasattr(self.viewmodel, 'comparison_data_ready'):
+            self.viewmodel.comparison_data_ready.connect(self.render_real_data)
+
+        if hasattr(self.viewmodel, 'error_occurred'):
+            self.viewmodel.error_occurred.connect(self.handle_error)
+
         self.list_cases.itemChanged.connect(self.enforce_max_cases)
         self.combo_granularity.currentTextChanged.connect(self.on_granularity_changed)
         self.btn_compare.clicked.connect(self.run_comparison)
@@ -228,96 +237,89 @@ class ComparisonView(QWidget):
             QMessageBox.warning(self, "Notice", "Please select at least 2 cases for comparison.")
             return
 
-        self.mock_render(selected_names)
+        # Guarda as seleções na memória
+        self.case_ids_cache = selected_ids
+        self.case_names_cache = selected_names
 
-    def mock_render(self, case_names):
-        indicadores = ["LOLP", "LOLE", "EPNS", "EENS", "LOLC"]
-        unidades = ["%", "h/yr", "MW", "MWh/yr", "$/yr"]
+        # Mapeia a granularidade visual para o backend
         granularity = self.combo_granularity.currentText()
+        gran_map = {"Global": "GLOBAL", "By Region": "REGION", "By Bus": "BUS"}
+        gran_api = gran_map.get(granularity, "GLOBAL")
         
-        # --- ATUALIZA A TABELA ---
-        self.table.clear()
-        
-        if granularity == "Global":
-            headers = ["Indicator", "Unit"] + case_names
-            self.table.setColumnCount(len(headers))
-            self.table.setHorizontalHeaderLabels(headers)
-            self.table.setRowCount(len(indicadores))
-            
-            self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        element = "ALL" # Fica como ALL por padrão (traz todos os elementos)
 
-            for row, ind in enumerate(indicadores):
+        self.btn_compare.setText("Loading...")
+        self.btn_compare.setEnabled(False)
+        
+        # Dispara a busca no banco!
+        self.viewmodel.fetch_multi_case_data(selected_ids, gran_api, element)
+
+    def render_real_data(self, response_data: dict):
+        """Recebe o JSON DTO do Backend e desempacota na tabela."""
+        self.btn_compare.setText("Generate Comparison")
+        self.btn_compare.setEnabled(True)
+        self.current_data = response_data
+        
+        indicadores = response_data.get("indicators", [])
+        unidades = response_data.get("units", {})
+        elements = response_data.get("elements", [])
+
+        if not elements or not indicadores:
+            QMessageBox.information(self, "No Data", "Não há dados para esta configuração.")
+            return
+
+        # --- PREENCHE A TABELA DINÂMICA ---
+        self.table.clear()
+        headers = ["Element", "Indicator", "Unit"] + self.case_names_cache
+        self.table.setColumnCount(len(headers))
+        self.table.setHorizontalHeaderLabels(headers)
+        self.table.setRowCount(len(elements) * len(indicadores))
+        
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        
+        row_idx = 0
+        for el in elements:
+            # 1. Elemento e Mesclagem (setSpan)
+            el_name = el.get("element_name", "N/A")
+            item_el = QTableWidgetItem(el_name)
+            item_el.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            font_el = item_el.font()
+            font_el.setBold(True)
+            item_el.setFont(font_el)
+            
+            self.table.setItem(row_idx, 0, item_el)
+            self.table.setSpan(row_idx, 0, len(indicadores), 1)
+            
+            vals_by_case = el.get("values_by_case", {})
+
+            # 2. Indicadores e Valores
+            for ind in indicadores:
                 item_ind = QTableWidgetItem(ind)
-                font = item_ind.font()
-                font.setBold(True)
-                item_ind.setFont(font)
-                self.table.setItem(row, 0, item_ind)
+                item_ind.setFont(font_el) # Negrito
+                self.table.setItem(row_idx, 1, item_ind)
                 
-                item_unit = QTableWidgetItem(unidades[row])
+                item_unit = QTableWidgetItem(unidades.get(ind, ""))
                 item_unit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 item_unit.setForeground(Qt.GlobalColor.darkGray)
-                self.table.setItem(row, 1, item_unit)
+                self.table.setItem(row_idx, 2, item_unit)
                 
-                for col, case in enumerate(case_names):
-                    val = 10.0 * (col + 1) * (row + 1) # Mock Global
-                    val_str = self.settings.format_number(val, is_table=True)
+                for col_idx, case_id in enumerate(self.case_ids_cache):
+                    val = vals_by_case.get(case_id, {}).get(ind)
+                    
+                    if val is None:
+                        val_str = "-"
+                    else:
+                        val_str = self.settings.format_number(val, is_table=True)
+
                     item_val = QTableWidgetItem(val_str)
                     item_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    self.table.setItem(row, 2 + col, item_val)
+                    self.table.setItem(row_idx, 3 + col_idx, item_val)
                     
-        else:
-            # Lógica Granular (Por Região ou Por Barra)
-            # Simula a lista de elementos dependendo da seleção
-            elements = [f"Region {i}" for i in range(1, 5)] if granularity == "By Region" else [f"Bus {i}" for i in range(1, 15)]
-            
-            headers = ["Element", "Indicator", "Unit"] + case_names
-            self.table.setColumnCount(len(headers))
-            self.table.setHorizontalHeaderLabels(headers)
-            
-            # O total de linhas é Elementos x Indicadores
-            self.table.setRowCount(len(elements) * len(indicadores))
-            
-            self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-            self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-            
-            row_idx = 0
-            for el in elements:
-                # Cria a célula do Elemento e aplica a MÁGICA da Mesclagem (setSpan)
-                item_el = QTableWidgetItem(el)
-                item_el.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                font_el = item_el.font()
-                font_el.setBold(True)
-                item_el.setFont(font_el)
-                
-                self.table.setItem(row_idx, 0, item_el)
-                # Mescla a coluna 0, descendo um número de linhas igual à quantidade de indicadores
-                self.table.setSpan(row_idx, 0, len(indicadores), 1)
-                
-                for ind_idx, ind in enumerate(indicadores):
-                    item_ind = QTableWidgetItem(ind)
-                    font_ind = item_ind.font()
-                    font_ind.setBold(True)
-                    item_ind.setFont(font_ind)
-                    self.table.setItem(row_idx, 1, item_ind)
-                    
-                    item_unit = QTableWidgetItem(unidades[ind_idx])
-                    item_unit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    item_unit.setForeground(Qt.GlobalColor.darkGray)
-                    self.table.setItem(row_idx, 2, item_unit)
-                    
-                    for col_idx, case in enumerate(case_names):
-                        # Valor simulado alterando por elemento e caso
-                        val = 10.0 * (col_idx + 1) * (ind_idx + 1) * (elements.index(el) + 1) 
-                        val_str = self.settings.format_number(val, is_table=True)
-                        item_val = QTableWidgetItem(val_str)
-                        item_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                        self.table.setItem(row_idx, 3 + col_idx, item_val)
-                        
-                    row_idx += 1
+                row_idx += 1
 
-        # --- PREENCHE OS COMBOBOXES DOS GRÁFICOS ---
+        # --- ATUALIZA COMBOBOXES DE GRÁFICOS ---
         self.combo_x.blockSignals(True)
         self.combo_y.blockSignals(True)
         self.combo_bar_ind.blockSignals(True)
@@ -329,107 +331,114 @@ class ComparisonView(QWidget):
         self.combo_x.addItems(indicadores)
         self.combo_y.addItems(indicadores)
         self.combo_bar_ind.addItems(indicadores)
-        
-        self.combo_y.setCurrentIndex(1 if len(indicadores) > 1 else 0)
+        if len(indicadores) > 1: self.combo_y.setCurrentIndex(1)
         
         self.combo_x.blockSignals(False)
         self.combo_y.blockSignals(False)
         self.combo_bar_ind.blockSignals(False)
 
-        # --- PLOTA OS GRÁFICOS ---
-        self.case_names_cache = case_names 
+        # Chama os gráficos
         self.plot_scatter()
         self.plot_bar()
 
+    def handle_error(self, message: str):
+        """Destrava a tela e exibe o erro retornado pelo Backend."""
+        self.btn_compare.setText("Generate Comparison")
+        self.btn_compare.setEnabled(True)
+        QMessageBox.critical(self, "Erro na Análise", message)
+
+        
     def plot_scatter(self):
         ind_x = self.combo_x.currentText()
         ind_y = self.combo_y.currentText()
-        if not ind_x or not ind_y or not hasattr(self, 'case_names_cache'): return
+        if not ind_x or not ind_y or not self.current_data: return
 
         self.scatter_ax.clear()
         colors = ['#2563EB', '#0B1220', '#22C55E', '#EF4444', '#8B5CF6'] 
+        elements = self.current_data.get("elements", [])
 
-        for i, case_name in enumerate(self.case_names_cache):
-            val_x = 10 * (i+1) 
-            val_y = 20 * (i+1) 
-            self.scatter_ax.scatter(val_x, val_y, s=150, color=colors[i % len(colors)], label=case_name, alpha=0.9, edgecolors='white', linewidth=1.5)
+        # Para cada caso, plotamos todos os elementos mapeados (Global=1 ponto, Bus=Vários pontos)
+        for i, case_id in enumerate(self.case_ids_cache):
+            case_name = self.case_names_cache[i]
+            color = colors[i % len(colors)]
+            
+            x_vals, y_vals = [], []
+            for el in elements:
+                vals = el.get("values_by_case", {}).get(case_id, {})
+                v_x, v_y = vals.get(ind_x), vals.get(ind_y)
+                if v_x is not None and v_y is not None:
+                    x_vals.append(v_x)
+                    y_vals.append(v_y)
+                    
+            if x_vals and y_vals:
+                self.scatter_ax.scatter(x_vals, y_vals, s=120, color=color, label=case_name, alpha=0.8, edgecolors='white', linewidth=1.0)
 
         self.scatter_ax.set_title(f"Correlation: {ind_y} vs {ind_x}", pad=15, fontweight='bold', color='#0F172A')
         self.scatter_ax.set_xlabel(f"{ind_x} Value") 
         self.scatter_ax.set_ylabel(f"{ind_y} Value")
         self.scatter_ax.grid(True, linestyle='--', alpha=0.5)
-        self.scatter_ax.legend(loc='upper right', fontsize=9, framealpha=0.9)
+        self.scatter_ax.legend(loc='upper right', fontsize=8, framealpha=0.9)
         self.scatter_figure.tight_layout()
         self.scatter_canvas.draw()
 
     def plot_bar(self):
         ind = self.combo_bar_ind.currentText()
-        if not ind or not hasattr(self, 'case_names_cache'): return
+        if not ind or not self.current_data: return
 
         self.bar_ax.clear()
         if self.pareto_ax:
             self.pareto_ax.remove()
             self.pareto_ax = None
 
-        granularity = self.combo_granularity.currentText()
-        element_filter = self.combo_element.currentText()
         colors = ['#2563EB', '#0B1220', '#22C55E', '#EF4444', '#8B5CF6']
-        n_cases = len(self.case_names_cache)
+        n_cases = len(self.case_ids_cache)
+        elements = self.current_data.get("elements", [])
+        
+        if not elements: return
 
-        # Lógica de Agrupamento: Se for Global, plota os Casos. Se for Região/Barra, plota agrupado por Região/Barra.
-        if granularity == "Global" or element_filter != "System Wide (All Elements Grouped)":
-            elements = self.case_names_cache
-            x = np.arange(len(elements))
-            valores = [15 * (i+1) for i in range(len(elements))]
-            bars = self.bar_ax.bar(x, valores, color=colors[:len(elements)], edgecolor='white', linewidth=1.2)
+        element_names = [el.get("element_name", "") for el in elements]
+        x = np.arange(len(element_names))
+        width = 0.8 / n_cases
+        data_matrix = [] 
+
+        for c, case_id in enumerate(self.case_ids_cache):
+            case_vals = []
+            for el in elements:
+                val = el.get("values_by_case", {}).get(case_id, {}).get(ind)
+                case_vals.append(val if val is not None else 0.0)
             
-            # Anotações em barra simples
-            for bar in bars:
-                height = bar.get_height()
-                self.bar_ax.annotate(f'{height:.2f}', xy=(bar.get_x() + bar.get_width() / 2, height), xytext=(0, 4), textcoords="offset points", ha='center', va='bottom', fontsize=8, color='#334155')
-
-            self.bar_ax.set_xticks(x)
-            self.bar_ax.set_xticklabels(elements, rotation=45, ha='right', fontsize=9)
+            data_matrix.append(case_vals)
+            offset = (c - n_cases/2 + 0.5) * width
             
-        else:
-            # Gráfico Agrupado (Múltiplas Barras por Elemento X)
-            elements = ["Region 1", "Region 2", "Region 3", "Region 4"] # Mock dinâmico
-            x = np.arange(len(elements))
-            width = 0.8 / n_cases
-
-            # Simulando matriz de dados (Linha = Caso, Coluna = Elemento)
-            data_matrix = []
-            for c in range(n_cases):
-                case_vals = [10*(c+1) + np.random.randint(1,10) for _ in elements]
-                data_matrix.append(case_vals)
-                offset = (c - n_cases/2 + 0.5) * width
-                self.bar_ax.bar(x + offset, case_vals, width, label=self.case_names_cache[c], color=colors[c], edgecolor='white', linewidth=1.0)
+            bars = self.bar_ax.bar(x + offset, case_vals, width, label=self.case_names_cache[c], color=colors[c], edgecolor='white', linewidth=1.0)
             
-            self.bar_ax.set_xticks(x)
-            # Rotação em 45 graus com ancoragem à direita para textos não sobreporem
-            self.bar_ax.set_xticklabels(elements, rotation=45, ha='right', fontsize=9)
-            self.bar_ax.legend(loc='upper right', fontsize=8)
+            # Anotações limpas e responsivas
+            if len(elements) <= 15: # Evita poluição se houver centenas de barras
+                for bar in bars:
+                    height = bar.get_height()
+                    if height > 0:
+                        self.bar_ax.annotate(f'{height:.2f}', xy=(bar.get_x() + bar.get_width() / 2, height), xytext=(0, 4), textcoords="offset points", ha='center', va='bottom', fontsize=7, color='#334155', rotation=90)
 
-            # --- LÓGICA DA CURVA DE PARETO (85%) ---
-            if self.chk_pareto.isChecked():
-                # Pareto é calculado pela média de contribuição do elemento entre os casos
-                avgs = np.mean(np.array(data_matrix), axis=0)
-                total = np.sum(avgs)
+        self.bar_ax.set_xticks(x)
+        self.bar_ax.set_xticklabels(element_names, rotation=45, ha='right', fontsize=8)
+        self.bar_ax.legend(loc='upper right', fontsize=8)
+
+        # Lógica da Curva de Pareto 85%
+        if self.chk_pareto.isChecked():
+            avgs = np.mean(np.array(data_matrix), axis=0)
+            total = np.sum(avgs)
+            if total > 0:
                 cum_perc = np.cumsum(avgs) / total * 100
-
                 self.pareto_ax = self.bar_ax.twinx()
-                self.pareto_ax.plot(x, cum_perc, color='#F59E0B', marker='D', linewidth=2, markersize=6, label="Cumulative %")
-                self.pareto_ax.set_ylabel("Cumulative Percentage (%)", color='#F59E0B')
+                self.pareto_ax.plot(x, cum_perc, color='#F59E0B', marker='D', linewidth=2, markersize=5, label="Cumulative %")
+                self.pareto_ax.set_ylabel("Cumulative %", color='#F59E0B')
                 self.pareto_ax.tick_params(axis='y', labelcolor='#F59E0B')
                 self.pareto_ax.set_ylim(0, 110)
                 
-                # Resgata o threshold de 85% do settings (Mockado como 85.0 para exibição segura)
                 pareto_threshold = getattr(self.settings, 'pareto_threshold', 85.0)
-                
-                # Encontra o ponto mais próximo dos 85%
                 idx_85 = np.abs(cum_perc - pareto_threshold).argmin()
-                self.pareto_ax.plot(x[idx_85], cum_perc[idx_85], marker='o', markersize=12, color='#EF4444')
-                self.pareto_ax.annotate(f'{pareto_threshold}% Threshold', (x[idx_85], cum_perc[idx_85]), textcoords="offset points", xytext=(-10, 15), ha='right', color='#EF4444', fontweight='bold', fontsize=9)
+                self.pareto_ax.plot(x[idx_85], cum_perc[idx_85], marker='o', markersize=10, color='#EF4444')
+                self.pareto_ax.annotate(f'{pareto_threshold}% Threshold', (x[idx_85], cum_perc[idx_85]), textcoords="offset points", xytext=(-10, 15), ha='right', color='#EF4444', fontweight='bold', fontsize=8)
 
         self.bar_ax.set_title(f"{ind} Distribution", pad=15, fontweight='bold', color='#0F172A')
         self.bar_ax.set_ylabel(f"{ind} Value")
@@ -437,6 +446,5 @@ class ComparisonView(QWidget):
         self.bar_ax.spines['top'].set_visible(False)
         self.bar_ax.spines['right'].set_visible(False)
         
-        # tight_layout previne que a rotação em 45 graus corte o nome das barras
         self.bar_figure.tight_layout() 
         self.bar_canvas.draw()
