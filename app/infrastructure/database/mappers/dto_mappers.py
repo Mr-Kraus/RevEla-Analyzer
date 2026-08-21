@@ -39,7 +39,9 @@ class ReliabilityResultDtoMapper:
             eens=clean_nan(dto.get("eens", 0.0)),
             lolf=clean_nan(dto.get("lolf", 0.0)),
             lold=clean_nan(dto.get("lold", 0.0)),
-            lolc=clean_nan(dto.get("lolc", 0.0))
+            lolc=clean_nan(dto.get("lolc", 0.0)),
+            # --- O ELO PERDIDO: Repassando o JSON ---
+            confidence_intervals=dto.get("confidence_intervals", {})
         )
     
 class SystemTopologyMapper:
@@ -52,7 +54,7 @@ class SystemTopologyMapper:
             case_id=case_id,
             simulation_run_id=simulation_run_id,
             external_name="SYSTEM_M02",
-            nominal_load_mw=0.0
+            nominal_load_mw=topology_dto.get("nominal_load_mw", 0.0)
         )
         
         region_models = {

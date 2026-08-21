@@ -1,6 +1,7 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QSpinBox, QComboBox, QRadioButton, QButtonGroup, 
-                             QPushButton, QGroupBox, QMessageBox)
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QComboBox, 
+    QLineEdit, QPushButton, QGroupBox, QMessageBox
+)
 from PyQt6.QtCore import Qt
 from ui.viewmodels.settings_viewmodel import SettingsViewModel
 
@@ -12,116 +13,102 @@ class SettingsView(QWidget):
         self.setup_connections()
 
     def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(30, 30, 30, 30)
+        main_layout.setSpacing(20)
 
-        title = QLabel("Configurações Pessoais de Visualização")
-        title.setStyleSheet("font-size: 28px; font-weight: bold; color: #2C3E50;")
-        layout.addWidget(title)
+        title = QLabel("⚙️ Configurações Gerais do Sistema")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #2C3E50;")
+        main_layout.addWidget(title)
 
-        # ==========================================
-        # GRUPO 1: FORMATAÇÃO NUMÉRICA E DECIMAIS
-        # ==========================================
-        group_decimals = QGroupBox("Formatação Numérica")
-        group_decimals.setStyleSheet("QGroupBox { font-weight: bold; font-size: 16px; color: #34495E; }")
-        dec_layout = QVBoxLayout(group_decimals)
-        dec_layout.setSpacing(15)
+        # 1. Grupo de Formatação de Números
+        group_format = QGroupBox("Formatação e Precisão")
+        group_format.setStyleSheet("QGroupBox { font-weight: bold; color: #2C3E50; border: 1px solid #D5D8DC; border-radius: 8px; margin-top: 10px; padding: 15px; } QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }")
+        layout_format = QVBoxLayout(group_format)
 
-        # Decimais em Tabelas
-        row_table = QHBoxLayout()
-        row_table.addWidget(QLabel("Casos Decimais em Tabelas:"))
-        self.spin_table_dec = QSpinBox()
-        self.spin_table_dec.setRange(0, 8)
-        self.spin_table_dec.setFixedWidth(80)
-        row_table.addWidget(self.spin_table_dec)
-        row_table.addStretch()
-        dec_layout.addLayout(row_table)
-
-        # Decimais em Gráficos
-        row_chart = QHBoxLayout()
-        row_chart.addWidget(QLabel("Casos Decimais em Gráficos:"))
-        self.spin_chart_dec = QSpinBox()
-        self.spin_chart_dec.setRange(0, 8)
-        self.spin_chart_dec.setFixedWidth(80)
-        row_chart.addWidget(self.spin_chart_dec)
-        row_chart.addStretch()
-        dec_layout.addLayout(row_chart)
-
-        # Formato do LOLP
-        row_lolp = QHBoxLayout()
-        row_lolp.addWidget(QLabel("Exibição do Indicador LOLP:"))
-        self.radio_decimal = QRadioButton("Decimal Padrão (ex: 0.00032)")
-        self.radio_scientific = QRadioButton("Potência de 10 / Notação Científica (ex: 3.20e-04)")
+        self.spin_table_dec = self._create_spinbox(layout_format, "Casas Decimais em Tabelas:", 0, 8)
+        self.spin_chart_dec = self._create_spinbox(layout_format, "Casas Decimais em Gráficos:", 0, 8)
         
-        self.lolp_group = QButtonGroup(self)
-        self.lolp_group.addButton(self.radio_decimal, 1)
-        self.lolp_group.addButton(self.radio_scientific, 2)
+        self.combo_lolp = QComboBox()
+        self.combo_lolp.addItems(["decimal", "scientific"])
+        self._add_row(layout_format, "Formato do Indicador LOLP:", self.combo_lolp)
+        main_layout.addWidget(group_format)
 
-        row_lolp.addWidget(self.radio_decimal)
-        row_lolp.addWidget(self.radio_scientific)
-        row_lolp.addStretch()
-        dec_layout.addLayout(row_lolp)
+        # 2. Grupo de Preferências Visuais
+        group_visual = QGroupBox("Preferências de Telas")
+        group_visual.setStyleSheet(group_format.styleSheet())
+        layout_visual = QVBoxLayout(group_visual)
 
-        layout.addWidget(group_decimals)
+        self.combo_chart = QComboBox()
+        self.combo_chart.addItems(["Pareto", "Barras", "Linha"])
+        self._add_row(layout_visual, "Tipo de Gráfico Padrão:", self.combo_chart)
 
-        # ==========================================
-        # GRUPO 2: PREFERÊNCIAS DE GRÁFICOS
-        # ==========================================
-        group_charts = QGroupBox("Padrões de Gráficos e Exibição")
-        group_charts.setStyleSheet("QGroupBox { font-weight: bold; font-size: 16px; color: #34495E; }")
-        chart_layout = QVBoxLayout(group_charts)
-        chart_layout.setSpacing(15)
+        self.combo_global = QComboBox()
+        self.combo_global.addItems(["Tipo 1: Detalhado por Caso", "Tipo 2: Comparativo Lado a Lado"])
+        self._add_row(layout_visual, "Aba Global Padrão:", self.combo_global)
+        main_layout.addWidget(group_visual)
 
-        row_chart_type = QHBoxLayout()
-        row_chart_type.addWidget(QLabel("Tipo de Gráfico Padrão de Início:"))
-        self.combo_chart_type = QComboBox()
-        self.combo_chart_type.addItems(["Pareto", "Barras", "Linhas", "Radar", "Donut"])
-        self.combo_chart_type.setFixedWidth(150)
-        row_chart_type.addWidget(self.combo_chart_type)
-        row_chart_type.addStretch()
-        chart_layout.addLayout(row_chart_type)
+        # 3. Grupo Conectividade
+        group_net = QGroupBox("Servidor & API")
+        group_net.setStyleSheet(group_format.styleSheet())
+        layout_net = QVBoxLayout(group_net)
+        
+        self.txt_api = QLineEdit()
+        self.txt_api.setStyleSheet("padding: 5px; border: 1px solid #BDC3C7; border-radius: 4px;")
+        self._add_row(layout_net, "Endereço da API Backend:", self.txt_api)
+        main_layout.addWidget(group_net)
 
-        layout.addWidget(group_charts)
-
-        # ==========================================
-        # BOTÃO SALVAR
-        # ==========================================
+        # Botão Salvar
         self.btn_save = QPushButton("💾 Salvar Configurações")
         self.btn_save.setFixedHeight(40)
         self.btn_save.setFixedWidth(200)
-        self.btn_save.setStyleSheet("""
-            QPushButton { background-color: #2980B9; color: white; font-weight: bold; border-radius: 5px; }
-            QPushButton:hover { background-color: #3498DB; }
-        """)
-        layout.addWidget(self.btn_save)
-        layout.addStretch()
+        self.btn_save.setStyleSheet("QPushButton { background-color: #27AE60; color: white; font-weight: bold; border-radius: 6px; } QPushButton:hover { background-color: #2ECC71; }")
+        
+        row_btn = QHBoxLayout()
+        row_btn.addStretch()
+        row_btn.addWidget(self.btn_save)
+        main_layout.addLayout(row_btn)
+        main_layout.addStretch()
+
+    def _create_spinbox(self, parent_layout, label_text, min_val, max_val):
+        spin = QSpinBox()
+        spin.setRange(min_val, max_val)
+        spin.setFixedWidth(100)
+        spin.setStyleSheet("padding: 5px; border: 1px solid #BDC3C7; border-radius: 4px;")
+        self._add_row(parent_layout, label_text, spin)
+        return spin
+
+    def _add_row(self, layout, label_text, widget):
+        row = QHBoxLayout()
+        lbl = QLabel(label_text)
+        lbl.setStyleSheet("font-size: 14px; color: #34495E;")
+        widget.setFixedHeight(35)
+        row.addWidget(lbl)
+        row.addWidget(widget)
+        row.addStretch()
+        layout.addLayout(row)
 
     def setup_connections(self):
-        self.btn_save.clicked.connect(self.handle_save)
-        self.viewmodel.settings_saved.connect(self.on_settings_saved)
+        self.btn_save.clicked.connect(self.save_settings)
+        self.viewmodel.settings_saved.connect(lambda: QMessageBox.information(self, "Sucesso", "Configurações salvas e aplicadas a todo o sistema!"))
 
     def load_data(self):
-        """Carrega as configurações salvas atualmente ao abrir esta aba."""
-        curr = self.viewmodel.get_current_settings()
-        self.spin_table_dec.setValue(curr["table_decimals"])
-        self.spin_chart_dec.setValue(curr["chart_decimals"])
-        
-        if curr["lolp_format"] == "scientific":
-            self.radio_scientific.setChecked(True)
-        else:
-            self.radio_decimal.setChecked(True)
+        """Chamado pelo MainWindow ao abrir a tela."""
+        config = self.viewmodel.load_settings()
+        self.spin_table_dec.setValue(config["table_decimals"])
+        self.spin_chart_dec.setValue(config["chart_decimals"])
+        self.combo_lolp.setCurrentText(config["lolp_format"])
+        self.combo_chart.setCurrentText(config["default_chart_type"])
+        self.combo_global.setCurrentIndex(config["global_view_type"])
+        self.txt_api.setText(config["api_url"])
 
-        self.combo_chart_type.setCurrentText(curr["default_chart_type"])
-
-    def handle_save(self):
-        lolp_fmt = "scientific" if self.radio_scientific.isChecked() else "decimal"
-        self.viewmodel.save_settings(
-            table_dec=self.spin_table_dec.value(),
-            chart_dec=self.spin_chart_dec.value(),
-            lolp_fmt=lolp_fmt,
-            chart_type=self.combo_chart_type.currentText()
-        )
-
-    def on_settings_saved(self, msg):
-        QMessageBox.information(self, "Configurações", msg)
+    def save_settings(self):
+        config = {
+            "table_decimals": self.spin_table_dec.value(),
+            "chart_decimals": self.spin_chart_dec.value(),
+            "lolp_format": self.combo_lolp.currentText(),
+            "default_chart_type": self.combo_chart.currentText(),
+            "global_view_type": self.combo_global.currentIndex(),
+            "api_url": self.txt_api.text().strip()
+        }
+        self.viewmodel.save_settings(config)

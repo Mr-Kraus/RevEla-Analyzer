@@ -41,9 +41,9 @@ def compare_simulations(
         target_id = request.target_simulation_ids[0]
         
         result_dto = use_case.execute(
-            sim_id_a=request.baseline_simulation_id,
-            sim_id_b=target_id,
-            indicator=request.indicator
+            request.baseline_simulation_id,
+            target_id,
+            request.indicator
         )
         
         return APIResponse(

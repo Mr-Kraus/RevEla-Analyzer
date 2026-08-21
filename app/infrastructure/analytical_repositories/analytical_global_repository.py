@@ -41,6 +41,8 @@ class AnalyticalGlobalRepository:
         bus_count = self.session.execute(select(func.count(BusModel.id)).where(BusModel.system_id == system.id)).scalar() or 0
         gen_capacity = self.session.execute(select(func.sum(GeneratorModel.nominal_capacity_mw)).where(GeneratorModel.system_id == system.id)).scalar() or 0.0
 
+        conf_dict = global_res.confidence_intervals if global_res and hasattr(global_res, 'confidence_intervals') and global_res.confidence_intervals else {}
+
         # Formatação Segura
         def s_fmt(val): return float(val or 0.0)
 
@@ -48,19 +50,19 @@ class AnalyticalGlobalRepository:
             "case_id": str(case_id),
             "case_name": case.display_name or case.external_name,
             "indicators": {
-                "LOLP": {"value": s_fmt(global_res.lolp) if global_res else 0.0, "unit": "%"},
-                "LOLE": {"value": s_fmt(global_res.lole) if global_res else 0.0, "unit": "h/ano"},
-                "EPNS": {"value": s_fmt(global_res.epns) if global_res else 0.0, "unit": "MW"},
-                "EENS": {"value": s_fmt(global_res.eens) if global_res else 0.0, "unit": "MWh/ano"},
-                "LOLF": {"value": s_fmt(global_res.lolf) if global_res else 0.0, "unit": "occ/ano"},
-                "LOLD": {"value": s_fmt(global_res.lold) if global_res else 0.0, "unit": "h/occ"},
-                "LOLC": {"value": s_fmt(global_res.lolc) if global_res else 0.0, "unit": "$/ano"}
+                "LOLP": {"value": s_fmt(global_res.lolp) if global_res else 0.0, "unit": "%", "conf": conf_dict.get("LOLP", "N/A")},
+                "LOLE": {"value": s_fmt(global_res.lole) if global_res else 0.0, "unit": "h/ano", "conf": conf_dict.get("LOLE", "N/A")},
+                "EPNS": {"value": s_fmt(global_res.epns) if global_res else 0.0, "unit": "MW", "conf": conf_dict.get("EPNS", "N/A")},
+                "EENS": {"value": s_fmt(global_res.eens) if global_res else 0.0, "unit": "MWh/ano", "conf": conf_dict.get("EENS", "N/A")},
+                "LOLF": {"value": s_fmt(global_res.lolf) if global_res else 0.0, "unit": "occ/ano", "conf": conf_dict.get("LOLF", "N/A")},
+                "LOLD": {"value": s_fmt(global_res.lold) if global_res else 0.0, "unit": "h/occ", "conf": conf_dict.get("LOLD", "N/A")},
+                "LOLC": {"value": s_fmt(global_res.lolc) if global_res else 0.0, "unit": "$/ano", "conf": conf_dict.get("LOLC", "N/A")}
             },
             "general_info": {
                 "Anos Simulados": str(sim_run.simulated_years or "N/A"),
                 "Tipo de Análise": str(sim_run.analysis_type or "N/A"),
                 "Data de Importação": sim_run.imported_at.strftime("%d/%m/%Y") if sim_run.imported_at else "N/A",
-                "Convergência": "Padrão", # Placeholder para expansão futura
+                "Convergência": "Padrão",
                 "Número de Barras": str(bus_count),
                 "Potência Instalada (MW)": f"{gen_capacity:.2f}",
                 "Carga do Sistema (MW)": f"{system.nominal_load_mw or 0.0:.2f}"

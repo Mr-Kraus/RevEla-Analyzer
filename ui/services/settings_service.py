@@ -59,6 +59,30 @@ class SettingsService(QObject):
         self.settings.setValue("default_chart_type", val)
         self.settings_changed.emit()
 
+    # --- VISUALIZAÇÃO DA ABA GLOBAL (Tipo 1 ou Tipo 2) ---
+    @property
+    def global_view_type(self) -> int:
+        """
+        0: Tipo 1 (Detalhado por Caso - Scroll com Cards)
+        1: Tipo 2 (Comparativo Lado a Lado - Tabela Única)
+        """
+        return int(self.settings.value("global_view_type", 0)) # Default: 0
+
+    @global_view_type.setter
+    def global_view_type(self, val: int):
+        self.settings.setValue("global_view_type", val)
+        self.settings_changed.emit()
+
+    # --- ENDEREÇO DA API ---
+    @property
+    def api_url(self) -> str:
+        return str(self.settings.value("api_url", "http://127.0.0.1:8000")) # Default local
+
+    @api_url.setter
+    def api_url(self, val: str):
+        self.settings.setValue("api_url", val)
+        self.settings_changed.emit()
+
     # --- MÉTODOS UTILITÁRIOS DE FORMATAÇÃO ---
     def format_number(self, value: float, is_table: bool = True, is_lolp: bool = False) -> str:
         """Formata qualquer número de acordo com as preferências atuais do usuário."""

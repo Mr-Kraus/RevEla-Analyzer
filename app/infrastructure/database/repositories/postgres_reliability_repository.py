@@ -21,7 +21,8 @@ class PostgresReliabilityRepository:
                 eens=r.eens,
                 lolf=r.lolf,
                 lold=r.lold,
-                lolc=r.lolc
+                lolc=r.lolc,
+                confidence_intervals=getattr(r, 'confidence_intervals', {})
             ) for r in results
         ]
         self.session.add_all(models)

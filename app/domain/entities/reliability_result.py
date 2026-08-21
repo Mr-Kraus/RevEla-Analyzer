@@ -1,6 +1,7 @@
 import uuid
-from typing import Optional
+from typing import Optional, Dict, Any
 from pydantic import BaseModel
+from dataclasses import dataclass, field
 
 class ReliabilityResult(BaseModel):
     """
@@ -20,3 +21,4 @@ class ReliabilityResult(BaseModel):
     lolf: float
     lold: float
     lolc: float
+    confidence_intervals: Dict[str, Any] = field(default_factory=dict)

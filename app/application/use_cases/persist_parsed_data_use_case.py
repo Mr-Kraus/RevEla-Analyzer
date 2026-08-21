@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 # Importação corrigida para refletir a localização real na infraestrutura
 from app.infrastructure.database.mappers.dto_mappers import ReliabilityResultDtoMapper, SystemTopologyMapper
 from app.infrastructure.database.repositories.postgres_reliability_repository import PostgresReliabilityRepository
+from app.infrastructure.database.models.simulation_model import SimulationRunModel # <-- Importação Adicionada!
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,13 @@ class PersistParsedDataUseCase:
         logger.info(f"Iniciando transação de persistência para Simulação: {simulation_run_id}")
         
         try:
+            logger.info("============== RASTREADOR - USE CASE ==============")
+            logger.info(f"Carga no topology_dto: {topology_dto.get('nominal_load_mw', 'NÃO CHEGOU')}")
+            logger.info(f"Anos no results_dto: {results_dto.get('simulated_years', 'NÃO CHEGOU')}")
+            logger.info(f"Confianca no results_dto (global): {results_dto.get('global_indices', {}).get('confidence_intervals', 'NÃO CHEGOU')}")
+            logger.info("===================================================")
+            
             # FASE 5: Persistência de Configurações
-            # (Aqui você pode atualizar o SimulationRunModel com simulated_years, etc)
             logger.debug("Mapeando configurações...")
 
             # FASE 4: Persistência de Topologia (Cascade fará a mágica)
@@ -43,6 +49,13 @@ class PersistParsedDataUseCase:
                     ReliabilityResultDtoMapper.to_domain(simulation_run_id, True, results_dto["global_indices"])
                 )
             
+            # Recupera a simulação atual para atualizar Anos e Tipo
+            simulation_run = self.session.get(SimulationRunModel, simulation_run_id)
+            if simulation_run:
+                # Variáveis corrigidas para os DTOs passados na função execute()
+                simulation_run.simulated_years = results_dto.get("simulated_years", 0)
+                simulation_run.analysis_type = settings_dto.get("analysis_type", "STA")
+
             # Por Barra
             for bus_res in results_dto.get("bus_indices", []):
                 results_entities.append(
