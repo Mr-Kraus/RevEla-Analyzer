@@ -1,10 +1,10 @@
 from pydantic import BaseModel
 from typing import List, Optional
-
+from fastapi import HTTPException
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
-
+from os import Path 
 import uuid
 from app.infrastructure.database.models.simulation_model import SimulationRunModel
 from sqlalchemy import select
@@ -15,6 +15,8 @@ from app.infrastructure.database.models.security_model import UserModel
 from app.api.schemas.base_schema import APIResponse
 from app.api.schemas.case_schema import CaseCreateRequest, CaseResponse
 from app.application.services.case_service import CaseService
+from app.application.pipelines.case_ingestion_pipeline import CaseIngestionPipeline
+from app.infrastructure.database.models.case_model import CaseModel
 
 router = APIRouter(prefix="/cases", tags=["Case Management"])
 
@@ -147,3 +149,45 @@ def update_region_aliases(
             region.alias = item.alias.strip() if item.alias else None
     db.commit()
     return APIResponse(success=True, data={}, message="Apelidos das regiões atualizados.")
+
+class CaseImportRequest(BaseModel):
+    software_version: str = "RELEVA"
+
+@router.post("/{case_id}/import", response_model=APIResponse)
+def import_case_files(
+    case_id: uuid.UUID,
+    payload: CaseImportRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Inicia o processamento (ingestão) dos arquivos CSV de um caso, 
+    utilizando a fábrica de parsers correta (RELEVA ou PSMora).
+    """
+    case_model = db.get(CaseModel, case_id)
+    if not case_model:
+        raise HTTPException(status_code=404, detail="Caso não encontrado.")
+
+    # Instancia o Pipeline
+    pipeline = CaseIngestionPipeline(db)
+    
+    # Gera um ID para a Simulação Pai
+    simulation_run_id = uuid.uuid4()
+    
+    # Executa o pipeline passando a versão do software escolhida!
+    success = pipeline.run(
+        case_id=case_id, 
+        simulation_run_id=simulation_run_id, 
+        case_folder=Path(case_model.source_path),
+        software_version=payload.software_version  # <--- NOVA INJEÇÃO AQUI
+    )
+    
+    if success:
+        # Atualiza o status do caso no banco
+        case_model.status = "READY"
+        db.commit()
+        return APIResponse(success=True, data={}, message="Ingestão concluída com sucesso.")
+    else:
+        case_model.status = "FAILED"
+        db.commit()
+        return APIResponse(success=False, data={}, message="Falha durante a ingestão dos dados.")

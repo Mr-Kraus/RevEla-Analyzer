@@ -33,9 +33,12 @@ class CasesViewModel(QObject):
         else:
             self.error_occurred.emit("Erro ao carregar a lista de casos.")
 
-    def import_case(self, folder_path: str, display_name: str):
+    def import_case(self, folder_path: str, display_name: str, software_version: str = "RELEVA"):
         self.import_started.emit()
         folder_name = os.path.basename(folder_path)
+        
+        # Salve a versão na classe para usarmos no próximo passo (on_case_registered)
+        self.current_software_version = software_version 
         
         payload = {
             "external_name": folder_name[:10],
@@ -55,8 +58,14 @@ class CasesViewModel(QObject):
                 data = resp_data.get("data", {})
                 self.current_case_id = data.get("id")
                 
-                # Só manda ingerir se o registro no banco deu 100% certo
-                self._ingest_worker = self.api_client.make_request_async("POST", f"/cases/{self.current_case_id}/import")
+                # 2. Envie a versão selecionada no corpo da requisição de importação
+                import_payload = {"software_version": self.current_software_version}
+                
+                self._ingest_worker = self.api_client.make_request_async(
+                    "POST", 
+                    f"/cases/{self.current_case_id}/import",
+                    json=import_payload
+                )
                 self._ingest_worker.finished.connect(self._on_case_ingested)
                 self._ingest_worker.error.connect(self.import_failed.emit)
                 self._ingest_worker.start()

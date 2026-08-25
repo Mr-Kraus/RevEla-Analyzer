@@ -1,47 +1,37 @@
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
 from app.ingestion.parsers.base_parser import BaseParser
 from app.ingestion.parsers.raw_dtos import RawSystemDTO, RawSystemBlockDTO
 
 logger = logging.getLogger(__name__)
 
-
 class TemplateSystemParser(BaseParser):
     """
-    Máquina de Estados para ler o 'Template System.csv'.
-
-    Extrai:
-    - blocos estruturados (<BARRAS>, <TRAFOS>, etc.)
-    - carga nominal do sistema (<CARGAP>)
+    Máquina de Estados Genérica para ler o 'Template System.csv'.
     """
+    def __init__(self, tag_mapping: Dict[str, str] = None):
+        super().__init__()
+        # Dicionário que traduz a Tag lida no arquivo para a Tag Canônica do REVELA
+        self.tag_mapping = tag_mapping or {}
 
     def parse(self, file_path: Path) -> RawSystemDTO:
-        logger.info(
-            f"Iniciando parsing de Sistema (Máquina de Estados): {file_path.name}"
-        )
-
+        logger.info(f"Iniciando parsing de Sistema: {file_path.name}")
         blocks = {}
-        
-        # Capturando a carga dinamicamente
         carga_nominal = 0.0
+        
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
+            
+            # (Mantém a lógica da CARGAP idêntica ao que você já fez)
             for i, line in enumerate(lines):
                 if line.startswith("<CARGAP>"):
-                    logger.info(f"[RASTREADOR - PARSER] Tag <CARGAP> encontrada na linha {i}")
                     if i + 1 < len(lines):
                         partes = lines[i+1].split(';')
-                        logger.info(f"[RASTREADOR - PARSER] Linha seguinte split: {partes}")
                         if len(partes) > 1 and partes[1].strip():
                             carga_nominal = float(partes[1].replace(',', '.'))
-                            logger.info(f"[RASTREADOR - PARSER] CARGA EXTRAÍDA COM SUCESSO: {carga_nominal}")
                     break
-        
-        # =====================================================
-        # MÁQUINA DE ESTADOS ORIGINAL
-        # =====================================================
 
         state = "SEARCHING"
         current_block = None
@@ -55,10 +45,12 @@ class TemplateSystemParser(BaseParser):
 
             if state == "SEARCHING":
                 if line.startswith("<") and line_clean.endswith(">"):
-                    tag = line_clean[1:-1].strip()
+                    original_tag = line_clean[1:-1].strip()
 
-                    if tag not in ["VAL", "\\VAL", "/VAL", "MODEL"]:
-                        current_block = tag
+                    if original_tag not in ["VAL", "\\VAL", "/VAL", "MODEL"]:
+                        # TRADUÇÃO MÁGICA: Pega o nome padrão, ou mantém o original se não tiver mapeamento
+                        current_block = self.tag_mapping.get(original_tag, original_tag)
+                        
                         state = "WAITING_FOR_VAL"
                         buffer_lines = []
                         records = []
@@ -72,52 +64,23 @@ class TemplateSystemParser(BaseParser):
                         buffer_lines.append(raw_line.strip("\n"))
 
             elif state == "READING_DATA":
-                if (
-                    line.startswith("<\\VAL>")
-                    or line.startswith("</VAL>")
-                ):
+                if line.startswith("<\\VAL>") or line.startswith("</VAL>"):
                     blocks[current_block] = RawSystemBlockDTO(
                         block_name=current_block,
                         headers=headers,
                         records=records,
                     )
-
-                    logger.debug(
-                        f"Bloco <{current_block}> capturado com "
-                        f"{len(records)} registros."
-                    )
-
                     state = "SEARCHING"
-
                 else:
                     if line_clean:
-                        parts = [
-                            p.strip()
-                            for p in raw_line.strip("\n").split(";")
-                        ]
-
+                        parts = [p.strip() for p in raw_line.strip("\n").split(";")]
                         record = {}
-
                         for i, h in enumerate(headers):
                             if h:
-                                record[h] = (
-                                    parts[i]
-                                    if i < len(parts)
-                                    else ""
-                                )
-
+                                record[h] = parts[i] if i < len(parts) else ""
                         records.append(record)
 
-        logger.info(
-            f"Parsing concluído. "
-            f"{len(blocks)} blocos extraídos. "
-            f"Carga nominal = {carga_nominal}"
-        )
-
-        return RawSystemDTO(
-            blocks=blocks,
-            carga_nominal=carga_nominal, # A carga vai para o DTO aqui!
-        )
+        return RawSystemDTO(blocks=blocks, carga_nominal=carga_nominal)
 
     def _extract_and_deduplicate_headers(
         self,

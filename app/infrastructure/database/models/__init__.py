@@ -11,5 +11,6 @@ from .region_model import RegionModel
 from .bus_model import BusModel
 from .security_model import UserModel, RoleModel, PermissionModel
 from .import_job_model import ImportJobModel
-
+from .time_series_metadata_model import TimeSeriesMetadataModel
+from .data_time_series_model import DataTimeSeriesModel
 

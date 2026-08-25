@@ -1,12 +1,16 @@
 from PyQt6.QtCore import QObject, pyqtSignal
 from ui.services.api_client import APIClient
 import requests
+from app.infrastructure.database.session.database import SessionLocal
+from app.application.use_cases.analytical.multi_compare_cases_use_case import MultiCompareCasesUseCase
+from app.application.use_cases.analytical.multi_compare_time_series_use_case import MultiCompareTimeSeriesUseCase
 
 class ComparisonViewModel(QObject):
     cases_loaded = pyqtSignal(list)
     comparison_data_ready = pyqtSignal(dict) 
     error_occurred = pyqtSignal(str)
     is_loading = pyqtSignal(bool)
+    time_series_data_ready = pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
@@ -101,3 +105,38 @@ class ComparisonViewModel(QObject):
                 
         except Exception as e:
             self.error_occurred.emit(f"Erro de conexão: {str(e)}")
+
+    def fetch_time_series_data(self, case_ids: list):
+        try:
+            # Abra a sessão com o banco (ajuste 'SessionLocal()' para o padrão do seu projeto)
+            with SessionLocal() as session: 
+                use_case = MultiCompareCasesUseCase(session)
+                
+                # Busca as séries de Carga ("Load")
+                result_data = use_case.execute(case_ids, series_type="Load")
+                
+                # Dispara o sinal enviando o dicionário para o Frontend
+                self.time_series_data_ready.emit(result_data)
+                
+        except Exception as e:
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(f"Erro ao buscar Séries Temporais: {str(e)}")
+            else:
+                print(f"Erro: {e}")
+
+    def fetch_time_series_data(self, case_ids: list):
+        # 1. Abre a conexão com o banco
+        session = SessionLocal() 
+        try:
+            use_case = MultiCompareTimeSeriesUseCase(session)
+            result_data = use_case.execute(case_ids, series_type="Load")
+            self.time_series_data_ready.emit(result_data)
+            
+        except Exception as e:
+            if hasattr(self, 'error_occurred'):
+                self.error_occurred.emit(f"Erro ao buscar Séries Temporais: {str(e)}")
+            else:
+                print(f"Erro: {e}")
+        finally:
+            # 4. Fecha a conexão com o banco para não travar o sistema
+            session.close()

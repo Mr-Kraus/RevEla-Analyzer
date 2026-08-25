@@ -117,6 +117,9 @@ class MainWindow(QMainWindow):
             self.view_global.load_data()
         elif button.page_index == 3 and hasattr(self.view_compare, 'load_data'):
             self.view_compare.load_data()
+        elif button.page_index == 4 and hasattr(self.view_detailed, 'load_data'):
+            self.view_detailed.load_data()
+            
         elif button.page_index == 5 and hasattr(self.view_settings, 'load_data'):
             self.view_settings.load_data()
 

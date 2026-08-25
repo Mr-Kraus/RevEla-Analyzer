@@ -66,4 +66,6 @@ class MultiCompareResponseDTO(BaseModel):
     indicators: List[str]
     units: Dict[str, str]
     granularity: str
+    case_informations: Dict[str, Dict[str, Any]] = {} 
+    system_summaries: Dict[str, Dict[str, Any]] = {}
     elements: List[MultiCompareElementDataDTO]

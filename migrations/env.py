@@ -6,6 +6,9 @@ from alembic import context
 # Importar nossas configurações e a Base do SQLAlchemy
 from config.settings import settings
 from app.infrastructure.database.models.base import Base
+from app.infrastructure.database.models.time_series_metadata_model import TimeSeriesMetadataModel
+from app.infrastructure.database.models.data_time_series_model import DataTimeSeriesModel
+
 
 config = context.config
 
