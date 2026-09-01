@@ -193,12 +193,29 @@ class CasesView(QWidget):
     def import_case(self):
         # 1. Seleciona a pasta
         folder = QFileDialog.getExistingDirectory(self, "Selecione a pasta do Caso")
-        if folder:
-            # 2. Pede ao usuário o nome do caso (o parâmetro que estava faltando)
-            display_name, ok = QInputDialog.getText(self, "Nome do Caso", "Digite um nome de exibição para este caso:")
-            if ok and display_name.strip():
-                # 3. Chama o viewmodel com ambos os parâmetros
-                self.viewmodel.import_case(folder, display_name.strip())
+        if not folder:
+            return
+
+        # 2. Pede ao usuário o nome do caso
+        display_name, ok_name = QInputDialog.getText(self, "Nome do Caso", "Digite um nome de exibição para este caso:")
+        if not ok_name or not display_name.strip():
+            return
+            
+        # 3. Pede ao usuário a versão do software
+        versions = ["RELEVA", "PSMora"]
+        software_version, ok_version = QInputDialog.getItem(
+            self, 
+            "Versão do Software", 
+            "Selecione a versão do software utilizada:", 
+            versions, 
+            0, 
+            False
+        )
+        if not ok_version:
+            return # Cancela a importação se o usuário fechar a janelinha
+
+        # 4. Chama o viewmodel passando a pasta, o nome e a versão!
+        self.viewmodel.import_case(folder, display_name.strip(), software_version)
 
     def populate_table(self, cases: list):
         self.table.setRowCount(0)

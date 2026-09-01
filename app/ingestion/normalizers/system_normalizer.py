@@ -6,6 +6,18 @@ from app.ingestion.parsers.raw_dtos import RawSystemDTO
 logger = logging.getLogger(__name__)
 
 class SystemNormalizer(BaseNormalizer):
+    
+    def _get_val(self, record: dict, *possible_keys) -> str:
+        """
+        Função blindada: Procura o valor no dicionário usando sinônimos 
+        e ignorando maiúsculas/minúsculas ou espaços em branco.
+        """
+        key_map = {k.strip().lower(): k for k in record.keys()}
+        for pk in possible_keys:
+            if pk.strip().lower() in key_map:
+                return str(record[key_map[pk.strip().lower()]]).strip()
+        return ""
+
     def normalize(self, raw_data: RawSystemDTO, **kwargs) -> Dict[str, Any]:
         logger.debug("Iniciando normalização da Topologia do Sistema...")
         
@@ -15,76 +27,92 @@ class SystemNormalizer(BaseNormalizer):
             "generation_classes": [],
             "transmission_lines": [],
             "transformers": [],
-            # INJETA A CARGA AQUI PARA O USE CASE / MAPPER LER:
             "nominal_load_mw": getattr(raw_data, 'carga_nominal', 0.0) 
         }
 
         blocks = raw_data.blocks
         unique_regions = set()
 
+        # 1. CLASSES DE GERAÇÃO
         if "CLGERA" in blocks:
             for record in blocks["CLGERA"].records:
                 try:
+                    ext_id = self._get_val(record, "CLAS", "CLASS")
+                    if not ext_id: continue
+                    
                     canonical_topology["generation_classes"].append({
-                        "external_id": str(record.get("CLAS", "")).strip(),
-                        "name": str(record.get("NAME", "")).strip(),
-                        "failure_rate_percent": self._safe_float(record.get("FRATE")),
-                        "repair_time_hours": self._safe_float(record.get("MTTR")),
-                        "nominal_capacity_mw": self._safe_float(record.get("RATED POW."))
+                        "external_id": ext_id,
+                        "name": self._get_val(record, "NAME", "NOME"),
+                        "failure_rate_percent": self._safe_float(self._get_val(record, "FRATE")),
+                        "repair_time_hours": self._safe_float(self._get_val(record, "MTTR")),
+                        "nominal_capacity_mw": self._safe_float(self._get_val(record, "RATED POW.", "Pot.Efetiva"))
                     })
                 except Exception as e:
                     logger.warning(f"Erro ao normalizar classe de geração: {e}")
 
+        # 2. BARRAS DO SISTEMA
         if "BARRAS" in blocks:
             for record in blocks["BARRAS"].records:
                 try:
-                    region_ext_id = str(record.get("REGION", "")).strip()
+                    ext_id = self._get_val(record, "ID")
+                    if not ext_id: continue
+
+                    region_ext_id = self._get_val(record, "REGION", "REGIAO")
                     if region_ext_id and region_ext_id != "0":
                         unique_regions.add(region_ext_id)
 
                     canonical_topology["buses"].append({
-                        "external_id": str(record.get("ID", "")).strip(),
-                        "name": str(record.get("NAME", "")).strip(),
+                        "external_id": ext_id,
+                        "name": self._get_val(record, "NAME", "NOME"),
                         "region_external_id": region_ext_id,
-                        "voltage_kv": self._safe_float(record.get("VOLTAGE_2"))
+                        "voltage_kv": self._safe_float(self._get_val(record, "VOLTAGE_2", "Tensao_2", "Tensao"))
                     })
                 except Exception as e:
                     logger.warning(f"Erro ao normalizar barra: {e}")
 
+        # 3. LINHAS DE TRANSMISSÃO
         if "LINHAS" in blocks:
             for record in blocks["LINHAS"].records:
                 try:
+                    ext_id = self._get_val(record, "ID")
+                    if not ext_id: continue
+
                     canonical_topology["transmission_lines"].append({
-                        "external_id": str(record.get("ID", "")).strip(),
-                        "name": str(record.get("NAME", "")).strip(),
-                        "from_bus_ext_id": str(record.get("FROM BUS", "")).strip(),
-                        "to_bus_ext_id": str(record.get("TO BUS", "")).strip(),
-                        "r_pu": self._safe_float(record.get("R")),
-                        "x_pu": self._safe_float(record.get("X")),
-                        "capacity_mva": self._safe_float(record.get("CAP.")),
-                        "failure_rate": self._safe_float(record.get("FRATE")),
-                        "repair_time": self._safe_float(record.get("MTTR"))
+                        "external_id": ext_id,
+                        "name": self._get_val(record, "NAME", "NOME"),
+                        "from_bus_ext_id": self._get_val(record, "FROM BUS"),
+                        "to_bus_ext_id": self._get_val(record, "TO BUS"),
+                        "r_pu": self._safe_float(self._get_val(record, "R")),
+                        "x_pu": self._safe_float(self._get_val(record, "X")),
+                        "capacity_mva": self._safe_float(self._get_val(record, "CAP.", "Capacidade")),
+                        "failure_rate": self._safe_float(self._get_val(record, "FRATE", "Frate Perm.", "Frate")),
+                        "repair_time": self._safe_float(self._get_val(record, "MTTR"))
                     })
                 except Exception as e:
                     logger.warning(f"Erro ao normalizar linha: {e}")
 
+        # 4. TRANSFORMADORES
         if "TRAFOS" in blocks:
             for record in blocks["TRAFOS"].records:
                 try:
+                    ext_id = self._get_val(record, "ID")
+                    if not ext_id: continue
+
                     canonical_topology["transformers"].append({
-                        "external_id": str(record.get("ID", "")).strip(),
-                        "name": str(record.get("NAME", "")).strip(),
-                        "from_bus_ext_id": str(record.get("FROM BUS", "")).strip(),
-                        "to_bus_ext_id": str(record.get("TO BUS", "")).strip(),
-                        "r_pu": self._safe_float(record.get("R")),
-                        "x_pu": self._safe_float(record.get("X")),
-                        "capacity_mva": self._safe_float(record.get("CAP.")),
-                        "failure_rate": self._safe_float(record.get("FRATE")),
-                        "repair_time": self._safe_float(record.get("MTTR"))
+                        "external_id": ext_id,
+                        "name": self._get_val(record, "NAME", "NOME"),
+                        "from_bus_ext_id": self._get_val(record, "FROM BUS"),
+                        "to_bus_ext_id": self._get_val(record, "TO BUS"),
+                        "r_pu": self._safe_float(self._get_val(record, "R")),
+                        "x_pu": self._safe_float(self._get_val(record, "X")),
+                        "capacity_mva": self._safe_float(self._get_val(record, "CAP.", "Capacidade")),
+                        "failure_rate": self._safe_float(self._get_val(record, "FRATE", "FRate Perm.", "Frate")),
+                        "repair_time": self._safe_float(self._get_val(record, "MTTR"))
                     })
                 except Exception as e:
                     logger.warning(f"Erro ao normalizar trafo: {e}")
                     
+        # Constrói o array de Regiões
         for reg_id in unique_regions:
             canonical_topology["regions"].append({
                 "external_id": reg_id,

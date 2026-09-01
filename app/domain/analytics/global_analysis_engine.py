@@ -34,7 +34,10 @@ class GlobalAnalysisEngine:
                 val = getattr(global_result_model, attr_name)
                 val_float = float(val) if val is not None else 0.0
                 
-                # Consulta a definição oficial do Catálogo (M03.2)
+                # Tenta buscar a confiança correspondente no modelo (ex: lole_conf ou confidence_intervals)
+                conf_attr = f"{attr_name}_conf"
+                conf_val = getattr(global_result_model, conf_attr, None) if hasattr(global_result_model, conf_attr) else "N/A"
+
                 catalog_def = IndicatorCatalog.get(code)
                 
                 indicators_summary[code] = {
@@ -43,9 +46,9 @@ class GlobalAnalysisEngine:
                     "value": val_float,
                     "unit": catalog_def.unit.value,
                     "category": catalog_def.category.value,
-                    "description": catalog_def.description
+                    "description": catalog_def.description,
+                    "conf": str(conf_val) if conf_val is not None else "N/A"
                 }
-
         return {
             "simulation_id": simulation_id,
             "case_name": case_name,

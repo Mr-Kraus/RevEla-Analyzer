@@ -1,12 +1,13 @@
 import logging
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, Union, List
 from sqlalchemy.orm import Session
 
 # Importação corrigida para refletir a localização real na infraestrutura
 from app.infrastructure.database.mappers.dto_mappers import ReliabilityResultDtoMapper, SystemTopologyMapper
 from app.infrastructure.database.repositories.postgres_reliability_repository import PostgresReliabilityRepository
-from app.infrastructure.database.models.simulation_model import SimulationRunModel # <-- Importação Adicionada!
+from app.infrastructure.database.models.simulation_model import SimulationRunModel 
+from app.infrastructure.database.models.config_model import SimulationConfigModel # <-- Importação da Tabela EAV Adicionada!
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,11 @@ class PersistParsedDataUseCase:
         self.session = session
         self.reliability_repo = PostgresReliabilityRepository(session)
 
+    # Permitindo receber tanto Dict quanto a List normalizada de Settings
     def execute(self, case_id: uuid.UUID, simulation_run_id: uuid.UUID, 
-                settings_dto: Dict[str, Any], topology_dto: Dict[str, Any], results_dto: Dict[str, Any]) -> None:
+                settings_dto: Union[Dict[str, Any], List[Dict[str, Any]]], 
+                topology_dto: Dict[str, Any], 
+                results_dto: Dict[str, Any]) -> None:
         
         logger.info(f"Iniciando transação de persistência para Simulação: {simulation_run_id}")
         
@@ -31,8 +35,34 @@ class PersistParsedDataUseCase:
             logger.info(f"Confianca no results_dto (global): {results_dto.get('global_indices', {}).get('confidence_intervals', 'NÃO CHEGOU')}")
             logger.info("===================================================")
             
-            # FASE 5: Persistência de Configurações
-            logger.debug("Mapeando configurações...")
+            # =========================================================
+            # FASE 5: Persistência de Configurações (Tabela EAV)
+            # =========================================================
+            logger.debug("Mapeando e salvando configurações...")
+            
+            # Garante a leitura independente de como o Orchestrator passa os dados
+            configs_to_save = settings_dto if isinstance(settings_dto, list) else settings_dto.get("parameters", [])
+            
+            # Fallback caso o Pipeline envie o dicionário bruto original
+            if isinstance(settings_dto, dict) and not configs_to_save:
+                configs_to_save = [
+                    {"parameter_key": k, "parameter_value": str(v), "value_type": type(v).__name__} 
+                    for k, v in settings_dto.items()
+                ]
+
+            analysis_type_val = "STA"
+            for conf in configs_to_save:
+                config_record = SimulationConfigModel(
+                    simulation_run_id=simulation_run_id,
+                    parameter_key=conf.get("parameter_key"),
+                    parameter_value=str(conf.get("parameter_value")),
+                    value_type=conf.get("value_type", "str")
+                )
+                self.session.add(config_record)
+                
+                # Intercepta o Analysis Type da lista EAV para a tabela raiz da Simulação
+                if conf.get("parameter_key") in ["Analysis Type", "ANALYSIS_TYPE"]:
+                    analysis_type_val = str(conf.get("parameter_value"))
 
             # FASE 4: Persistência de Topologia (Cascade fará a mágica)
             logger.debug("Mapeando topologia em cascata...")
@@ -44,8 +74,6 @@ class PersistParsedDataUseCase:
             results_entities = []
             
             # Globais
-            # ... [código existente]
-            # Globais
             if "global_indices" in results_dto and results_dto["global_indices"]:
                 results_entities.append(
                     ReliabilityResultDtoMapper.to_domain(simulation_run_id, True, results_dto["global_indices"])
@@ -55,11 +83,12 @@ class PersistParsedDataUseCase:
             simulation_run = self.session.get(SimulationRunModel, simulation_run_id)
             if simulation_run:
                 simulation_run.simulated_years = results_dto.get("simulated_years", 0)
-                simulation_run.analysis_type = settings_dto.get("analysis_type", "STA")
-            regioes_para_salvar = results_dto.get("region_indices", [])
+                simulation_run.analysis_type = analysis_type_val
+
             logger.info("============== RASTREADOR: USE CASE ==============")
-            logger.info(f"Regiões recebidas para salvar no banco: {len(regioes_para_salvar)}")
+            logger.info(f"Regiões recebidas para salvar no banco: {len(results_dto.get('region_indices', []))}")
             logger.info("==================================================")
+            
             # =========================================================
             # NOVA FASE: Por Região
             # =========================================================

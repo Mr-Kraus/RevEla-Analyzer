@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy import String, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 from app.infrastructure.database.models.base import Base
 
 class SimulationConfigModel(Base):
@@ -13,6 +13,7 @@ class SimulationConfigModel(Base):
     parameter_key: Mapped[str] = mapped_column(String, nullable=False)
     parameter_value: Mapped[str] = mapped_column(String, nullable=True)
     value_type: Mapped[str] = mapped_column(String, nullable=True)
-
-    # Relacionamento
-    simulation_run = relationship("SimulationRunModel", backref="configurations")
+    simulation_run = relationship(
+        "SimulationRunModel", 
+        backref=backref("configurations", cascade="all, delete-orphan", passive_deletes=True)
+    )

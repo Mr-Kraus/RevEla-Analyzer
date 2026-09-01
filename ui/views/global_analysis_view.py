@@ -5,8 +5,6 @@ from ui.viewmodels.global_analysis_viewmodel import GlobalAnalysisViewModel
 from ui.services.settings_service import SettingsService
 
 
-
-
 class GlobalAnalysisView(QWidget):
     def __init__(self):
         super().__init__()
@@ -44,7 +42,7 @@ class GlobalAnalysisView(QWidget):
         self.cards_grid = QGridLayout()
         self.cards_grid.setSpacing(20)
         
-        # Vamos criar variáveis para guardar a referência dos valores na tela
+        # Variáveis de Referência dos Indicadores Matemáticos
         self.val_lole = self.create_indicator_card("LOLE (h/ano)", self.cards_grid, 0, 0)
         self.val_epns = self.create_indicator_card("EPNS (MW)", self.cards_grid, 0, 1)
         self.val_eens = self.create_indicator_card("EENS (MWh)", self.cards_grid, 0, 2)
@@ -52,6 +50,11 @@ class GlobalAnalysisView(QWidget):
         self.val_lolp = self.create_indicator_card("LOLP", self.cards_grid, 1, 0)
         self.val_lolf = self.create_indicator_card("LOLF (occ/ano)", self.cards_grid, 1, 1)
         self.val_lold = self.create_indicator_card("LOLD (h/occ)", self.cards_grid, 1, 2)
+
+        # Variáveis de Referência dos Metadados (Configurações do Caso)
+        self.val_analysis_type = self.create_indicator_card("Tipo de Análise", self.cards_grid, 2, 0)
+        self.val_beta = self.create_indicator_card("Convergência (Beta)", self.cards_grid, 2, 1)
+        self.val_years = self.create_indicator_card("Anos Simulados", self.cards_grid, 2, 2)
 
         layout.addLayout(self.cards_grid)
         layout.addStretch() # Empurra tudo para cima
@@ -110,11 +113,24 @@ class GlobalAnalysisView(QWidget):
                 self.val_lole.setText("Calculando...")
                 self.val_epns.setText("Calculando...")
                 self.val_eens.setText("Calculando...")
+                self.val_lolp.setText("Calculando...")
+                self.val_lolf.setText("Calculando...")
+                self.val_lold.setText("Calculando...")
+                
+                self.val_analysis_type.setText("-")
+                self.val_beta.setText("-")
+                self.val_years.setText("-")
+                
                 # Aciona a API
                 self.viewmodel.load_analysis(case_id)
 
-    def update_indicators(self, indicators: dict):
-        settings = SettingsService.get_instance() # <-- Alterado aqui!
+    def update_indicators(self, data: dict):
+        """Recebe o pacote completo do ViewModel e descasca as informações nas áreas corretas"""
+        settings = SettingsService.get_instance()
+        
+        # Desempacota as gavetas mastigadas pelo ViewModel
+        indicators = data.get("indicators", {})
+        general_info = data.get("general_info", {})
 
         def extract_val(key: str) -> float:
             item = indicators.get(key, 0)
@@ -127,15 +143,18 @@ class GlobalAnalysisView(QWidget):
             except (ValueError, TypeError):
                 return 0.0
 
-        # Formatação dinâmica usando as preferências do usuário
+        # --- PREENCHE OS INDICADORES DE CONFIABILIDADE ---
         self.val_lole.setText(settings.format_number(extract_val('LOLE'), is_table=True))
         self.val_epns.setText(settings.format_number(extract_val('EPNS'), is_table=True))
         self.val_eens.setText(settings.format_number(extract_val('EENS'), is_table=True))
-        
-        # O LOLP passa o flag 'is_lolp=True' para respeitar a escolha de Notação Científica vs Decimal
         self.val_lolp.setText(settings.format_number(extract_val('LOLP'), is_table=True, is_lolp=True))
         self.val_lolf.setText(settings.format_number(extract_val('LOLF'), is_table=True))
         self.val_lold.setText(settings.format_number(extract_val('LOLD'), is_table=True))
+
+        # --- PREENCHE OS METADADOS DE SIMULAÇÃO ---
+        self.val_analysis_type.setText(str(general_info.get("Tipo de Análise", "N/A")))
+        self.val_beta.setText(str(general_info.get("Convergência (Beta)", "N/A")))
+        self.val_years.setText(str(general_info.get("Anos Simulados", "N/A")))
 
     def show_error(self, msg):
         QMessageBox.warning(self, "Erro", msg)

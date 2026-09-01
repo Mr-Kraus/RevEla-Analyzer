@@ -10,6 +10,7 @@ class GlobalAnalysisViewModel(QObject):
     def __init__(self):
         super().__init__()
         self.api_client = APIClient()
+        self.current_sim_info = {} # Cache das informações da Simulação
 
     def load_cases(self):
         """Busca os casos para popular o ComboBox (Dropdown)."""
@@ -41,9 +42,11 @@ class GlobalAnalysisViewModel(QObject):
         if response.status_code == 200:
             sims = response.json().get("data", [])
             if sims:
-                sim_id = sims[0].get("simulation_id") # Pega a simulação mais recente
+                # Guarda as informações da Simulação (Analysis Type, Years, etc)
+                self.current_sim_info = sims[0] 
+                sim_id = self.current_sim_info.get("simulation_id", self.current_sim_info.get("id"))
                 
-                # Passo 2: Busca os indicadores globais matemáticos
+                # Passo 2: Busca os indicadores globais e metadados
                 self._analysis_worker = self.api_client.make_request_async("GET", f"/analysis/global/{sim_id}")
                 self._analysis_worker.finished.connect(self._on_analysis_loaded)
                 self._analysis_worker.error.connect(self._on_error)
@@ -59,10 +62,27 @@ class GlobalAnalysisViewModel(QObject):
         self.is_loading.emit(False)
         if response.status_code == 200:
             data = response.json().get("data", {})
-            self.analysis_loaded.emit(data.get("indicators", {}))
+            
+            indicators = data.get("indicators", {})
+            case_info = data.get("case_informations", data.get("metadata", {}))
+            sim_info = getattr(self, "current_sim_info", {})
+            
+            # Busca as variáveis considerando a chave crua do CSV ou a chave do Normalizador
+            analysis_type = sim_info.get("analysis_type", case_info.get("Analysis Type", case_info.get("ANALYSIS_TYPE", "N/A")))
+            beta = case_info.get("Convergence Beta", case_info.get("COEF_BETA", "N/A"))
+            sim_years = sim_info.get("simulated_years", case_info.get("Anos Simulados", case_info.get("simulated_years", "N/A")))
+            
+            enriched_data = {
+                "indicators": indicators,
+                "case_informations": case_info,
+                "simulation_info": sim_info,
+                "general_info": {
+                    "Tipo de Análise": analysis_type,
+                    "Convergência (Beta)": beta,
+                    "Anos Simulados": sim_years
+                }
+            }
+            
+            self.analysis_loaded.emit(enriched_data)
         else:
             self.error_occurred.emit("Erro ao carregar análise global.")
-
-    def _on_error(self, msg):
-        self.is_loading.emit(False)
-        self.error_occurred.emit(msg)

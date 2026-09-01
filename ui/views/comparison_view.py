@@ -1,21 +1,47 @@
 import uuid
+import colorsys
+
 import numpy as np
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, 
-    QListWidget, QListWidgetItem, QTabWidget, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QGroupBox, QCheckBox, QScrollArea, QFrame, QSizePolicy, QSpinBox
-)
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect
-from PyQt6.QtWidgets import QTreeWidget
-# Integração do Matplotlib com PyQt6
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
-    QGroupBox, QTreeWidget, QTreeWidgetItem  # <--- ADICIONE ESTES DOIS AQUI
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QComboBox,
+    QListWidget,
+    QListWidgetItem,
+    QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QMessageBox,
+    QGroupBox,
+    QCheckBox,
+    QScrollArea,
+    QFrame,
+    QSizePolicy,
+    QSpinBox,
+    QTreeWidget,
+    QTreeWidgetItem,
 )
+
 from ui.services.settings_service import SettingsService
 from ui.viewmodels.comparison_viewmodel import ComparisonViewModel
+
+
+# Força o Matplotlib a usar Arial globalmente
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.sans-serif'] = ['Arial']
+
+
 
 class ComparisonView(QWidget):
     def __init__(self):
@@ -27,6 +53,9 @@ class ComparisonView(QWidget):
         self.case_ids_cache = []
         self.case_names_cache = []
         
+        # Cache para lembrar quais caixinhas estavam marcadas em cada granularidade
+        self.filter_state_cache = {}
+        
         # Paleta de Cores Moderna e Vibrante (Tailwind Colors)
         self.chart_colors = ['#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6']
         
@@ -35,104 +64,261 @@ class ComparisonView(QWidget):
 
     def setup_ui(self):
         self.setStyleSheet("""
-            QWidget { 
-                background-color: #F8FAFC; 
-                font-family: 'Segoe UI', Arial, sans-serif; 
-                color: #0F172A; 
-            }
-            QGroupBox { 
-                font-weight: bold; 
-                border: 1px solid #CBD5E1; 
-                border-radius: 8px; 
-                margin-top: 15px; 
-                padding-top: 15px; 
-                background-color: #FFFFFF;
-            }
-            QGroupBox::title { 
-                subcontrol-origin: margin; 
-                subcontrol-position: top left; 
-                padding: 0 8px; 
-                color: #334155; 
-            }
-            QComboBox, QListWidget { 
-                border: 1px solid #CBD5E1; 
-                border-radius: 6px; 
-                padding: 6px; 
-                background-color: #FFFFFF; 
-                selection-background-color: #E0F2FE;
-                selection-color: #0369A1;
-            }
-            QScrollArea { 
-                border: none; 
-                background-color: #FFFFFF; 
-            }
-            QCheckBox { 
-                spacing: 8px; 
-                font-size: 12px; 
-                color: #334155; 
-            }
-            QCheckBox::indicator { 
-                width: 16px; 
-                height: 16px; 
-                border-radius: 4px; 
-                border: 1px solid #CBD5E1; 
-                background: #FFFFFF; 
-            }
-            QCheckBox::indicator:checked { 
-                background: #0284C7; 
-                border: 1px solid #0284C7; 
-            }
-            
-            /* ========================================= */
-            /* SCROLLBARS MODERNAS E CLEAN               */
-            /* ========================================= */
-            QScrollBar:vertical {
-                border: none;
-                background: transparent;
-                width: 8px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: #CBD5E1;
-                min-height: 30px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #94A3B8;
-            }
-            /* Esconde as setinhas feias de cima e de baixo */
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-                background: none;
-            }
-            /* Deixa o fundo do trilho invisível */
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: transparent;
-            }
-            
-            /* SCROLLBAR HORIZONTAL */
-            QScrollBar:horizontal {
-                border: none;
-                background: transparent;
-                height: 8px;
-                margin: 0px;
-            }
-            QScrollBar::handle:horizontal {
-                background: #CBD5E1;
-                min-width: 30px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:horizontal:hover {
-                background: #94A3B8;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                width: 0px;
-                background: none;
-            }
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-                background: transparent;
-            }
-        """)
+        /* =========================================================
+           BASE
+           ========================================================= */
+
+        QWidget {
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: #0F172A;
+        }
+
+        /* =========================================================
+           GROUP BOX
+           ========================================================= */
+
+        QGroupBox {
+            font-weight: bold;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            margin-top: 15px;
+            padding-top: 15px;
+            background-color: #FFFFFF;
+        }
+
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            padding: 0 8px;
+            color: #334155;
+        }
+
+        /* =========================================================
+           COMBO BOX
+           ========================================================= */
+
+        QComboBox {
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            padding: 6px;
+            background-color: #FFFFFF;
+            color: #0F172A;
+        }
+
+        QComboBox:hover,
+        QComboBox:focus {
+            border: 1px solid #0284C7;
+        }
+
+        QComboBox QAbstractItemView {
+            border: 1px solid #CBD5E1;
+            background-color: #FFFFFF;
+            selection-background-color: #E0F2FE;
+            selection-color: #0369A1;
+        }
+
+        /* =========================================================
+           LIST WIDGET
+           ========================================================= */
+
+        QListWidget {
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            padding: 6px;
+            background-color: #FFFFFF;
+            color: #0F172A;
+        }
+
+        QListWidget::item {
+            padding: 4px;
+        }
+
+        QListWidget::item:hover {
+            background-color: #F1F5F9;
+        }
+
+        QListWidget::item:selected {
+            background-color: #E0F2FE;
+            color: #0369A1;
+        }
+
+        /* =========================================================
+           CHECK BOX
+           ========================================================= */
+
+        QCheckBox {
+            spacing: 8px;
+            font-size: 12px;
+            color: #334155;
+        }
+
+        QCheckBox::indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid #CBD5E1;
+            background-color: #FFFFFF;
+        }
+
+        QCheckBox::indicator:hover {
+            border: 1px solid #0284C7;
+        }
+
+        QCheckBox::indicator:checked {
+            background-color: #0284C7;
+            border: 1px solid #0284C7;
+        }
+
+        /* =========================================================
+           SCROLL AREA
+           ========================================================= */
+
+        QScrollArea {
+            border: none;
+            background-color: #F8FAFC;
+        }
+
+        QScrollArea > QWidget > QWidget {
+            background-color: #F8FAFC;
+        }
+
+        /* =========================================================
+           SCROLL BAR - VERTICAL
+           ========================================================= */
+
+        QScrollBar:vertical {
+            border: none;
+            background: transparent;
+            width: 8px;
+            margin: 0;
+        }
+
+        QScrollBar::handle:vertical {
+            background: #CBD5E1;
+            min-height: 30px;
+            border-radius: 4px;
+        }
+
+        QScrollBar::handle:vertical:hover {
+            background: #94A3B8;
+        }
+
+        QScrollBar::add-line:vertical,
+        QScrollBar::sub-line:vertical {
+            height: 0;
+            background: none;
+        }
+
+        QScrollBar::add-page:vertical,
+        QScrollBar::sub-page:vertical {
+            background: transparent;
+        }
+
+        /* =========================================================
+           SCROLL BAR - HORIZONTAL
+           ========================================================= */
+
+        QScrollBar:horizontal {
+            border: none;
+            background: transparent;
+            height: 8px;
+            margin: 0;
+        }
+
+        QScrollBar::handle:horizontal {
+            background: #CBD5E1;
+            min-width: 30px;
+            border-radius: 4px;
+        }
+
+        QScrollBar::handle:horizontal:hover {
+            background: #94A3B8;
+        }
+
+        QScrollBar::add-line:horizontal,
+        QScrollBar::sub-line:horizontal {
+            width: 0;
+            background: none;
+        }
+
+        QScrollBar::add-page:horizontal,
+        QScrollBar::sub-page:horizontal {
+            background: transparent;
+        }
+
+        /* =========================================================
+           TREE WIDGET
+           ========================================================= */
+
+        QTreeWidget {
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            padding: 5px;
+            background-color: #FFFFFF;
+            color: #0F172A;
+        }
+
+        QTreeWidget::item {
+            padding: 4px;
+            border-bottom: 1px solid #F8FAFC;
+        }
+
+        QTreeWidget::item:hover {
+            background-color: #F1F5F9;
+        }
+
+        QTreeWidget::item:selected {
+            background-color: #E0F2FE;
+            color: #0369A1;
+        }
+
+        QTreeWidget::indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            border: 1px solid #94A3B8;
+            background-color: #FFFFFF;
+        }
+
+        QTreeWidget::indicator:hover {
+            border: 1px solid #0284C7;
+        }
+
+        QTreeWidget::indicator:checked {
+            background-color: #0284C7;
+            border: 1px solid #0284C7;
+        }
+
+        /* =========================================================
+           SPIN BOX
+           ========================================================= */
+
+        QSpinBox {
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            padding: 6px 12px;
+            background-color: #FFFFFF;
+            color: #0F172A;
+            font-weight: 600;
+        }
+
+        QSpinBox:hover,
+        QSpinBox:focus {
+            border: 1px solid #0284C7;
+        }
+
+        QSpinBox::up-button,
+        QSpinBox::down-button {
+            background-color: #F1F5F9;
+            border-left: 1px solid #CBD5E1;
+            width: 18px;
+        }
+
+        QSpinBox::up-button:hover,
+        QSpinBox::down-button:hover {
+            background-color: #E2E8F0;
+        }
+    """)
 
         # LAYOUT BASE (Permite o painel lateral)
         base_layout = QHBoxLayout(self)
@@ -490,10 +676,23 @@ class ComparisonView(QWidget):
         
         self.btn_select_all.clicked.connect(self.select_all_elements)
         self.btn_deselect_all.clicked.connect(self.deselect_all_elements)
+        
+        # Conecta a atualização do cache e do gráfico a qualquer clique na lista
+        self.list_elements_filter.itemChanged.connect(self.save_filter_state)
         self.list_elements_filter.itemChanged.connect(self.plot_bar)
 
         self.btn_apply.clicked.connect(self.plot_bar)
         self.btn_restore.clicked.connect(self.restore_defaults)
+
+    def save_filter_state(self, item=None):
+        """Salva as escolhas atuais da list_elements_filter na granularidade ativa."""
+        granularity = self.combo_granularity.currentText()
+        checked_names = set()
+        for i in range(self.list_elements_filter.count()):
+            list_item = self.list_elements_filter.item(i)
+            if list_item.checkState() == Qt.CheckState.Checked:
+                checked_names.add(list_item.text())
+        self.filter_state_cache[granularity] = checked_names
 
     def restore_defaults(self):
         self.chk_hide_nulls.setChecked(True)
@@ -512,6 +711,7 @@ class ComparisonView(QWidget):
         for i in range(self.list_elements_filter.count()):
             self.list_elements_filter.item(i).setCheckState(Qt.CheckState.Checked)
         self.list_elements_filter.blockSignals(False)
+        self.save_filter_state()
         self.plot_bar()
 
     def deselect_all_elements(self):
@@ -519,6 +719,7 @@ class ComparisonView(QWidget):
         for i in range(self.list_elements_filter.count()):
             self.list_elements_filter.item(i).setCheckState(Qt.CheckState.Unchecked)
         self.list_elements_filter.blockSignals(False)
+        self.save_filter_state()
         self.plot_bar()
 
     def load_data(self):
@@ -589,15 +790,31 @@ class ComparisonView(QWidget):
             QMessageBox.information(self, "No Data", "Não há dados para esta configuração.")
             return
 
-        # --- PREENCHE FILTRO DE GRÁFICOS ---
+        # --- PREENCHE FILTRO DE GRÁFICOS (COM MEMÓRIA DE ESTADO) ---
+        granularity = self.combo_granularity.currentText()
+        
+        # Se for a primeira vez, marca todos e guarda no cache.
+        if granularity not in self.filter_state_cache:
+            self.filter_state_cache[granularity] = {el.get("element_name", "N/A") for el in elements}
+            
+        saved_checked_names = self.filter_state_cache.get(granularity, set())
+
         self.list_elements_filter.blockSignals(True)
         self.list_elements_filter.clear()
+        
         for el in elements:
             el_name = el.get("element_name", "N/A")
             item = QListWidgetItem(el_name)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Checked)
+            
+            # Restaura a memória das caixas de seleção
+            if el_name in saved_checked_names:
+                item.setCheckState(Qt.CheckState.Checked)
+            else:
+                item.setCheckState(Qt.CheckState.Unchecked)
+                
             self.list_elements_filter.addItem(item)
+            
         self.list_elements_filter.blockSignals(False)
 
         # --- CONFIGURAÇÃO DA SUPER TABELA ---
@@ -622,7 +839,6 @@ class ComparisonView(QWidget):
         
         row_idx = 0
         
-        # Função auxiliar para renderizar cabeçalhos de seção (linhas mescladas)
         def add_section_header(title):
             nonlocal row_idx
             item = QTableWidgetItem(title)
@@ -759,12 +975,11 @@ class ComparisonView(QWidget):
             self.pareto_ax.remove()
             self.pareto_ax = None
 
-        # Configurações do Drawer
         hide_nulls = self.chk_hide_nulls.isChecked()
         show_titles = self.chk_show_titles.isChecked()
         colors = self.chart_colors if self.combo_color.currentText() == "Padrão (Tailwind)" else ['#000000', '#E69F00', '#56B4E9', '#009E73', '#F0E442']
         
-        # Filtro de Checkbox
+        # Puxa os dados apenas dos marcados usando cache/filtro
         checked_names = set()
         for i in range(self.list_elements_filter.count()):
             item = self.list_elements_filter.item(i)
@@ -773,14 +988,12 @@ class ComparisonView(QWidget):
 
         all_elements = self.current_data.get("elements", [])
         
-        # Filtro de Nulos
         elements = []
         for el in all_elements:
             if el.get("element_name") not in checked_names:
                 continue
             
             if hide_nulls:
-                # Mantém se pelo menos UM caso tiver valor > 0
                 has_value = any(el.get("values_by_case", {}).get(c, {}).get(ind, 0.0) > 0 for c in self.case_ids_cache)
                 if not has_value:
                     continue
@@ -792,7 +1005,6 @@ class ComparisonView(QWidget):
             self.bar_canvas.draw()
             return
 
-        # Ordenação
         sort_mode = self.combo_sort_bar.currentText()
         def get_avg_val(el):
             vals = [el.get("values_by_case", {}).get(c, {}).get(ind, 0.0) for c in self.case_ids_cache]
@@ -810,7 +1022,6 @@ class ComparisonView(QWidget):
         element_names = [el.get("element_name", "") for el in elements]
         x = np.arange(len(element_names))
         
-        # Densidade
         density = self.combo_density.currentText()
         width = 0.8 / n_cases if density == "Normal" else (0.95 / n_cases if density == "Compacta" else 0.6 / n_cases)
         
@@ -830,7 +1041,6 @@ class ComparisonView(QWidget):
                 label=self.case_names_cache[c], color=colors[c % len(colors)], edgecolor='white', linewidth=0.5, alpha=0.95
             )
 
-        # Labels do Eixo X
         if show_titles:
             font_size = 7 if self.combo_font_size.currentText() == "Pequeno" else (9 if self.combo_font_size.currentText() == "Médio" else 11)
             self.bar_ax.set_xticks(x)
@@ -839,7 +1049,6 @@ class ComparisonView(QWidget):
             self.bar_ax.set_xticks([])
             self.bar_ax.set_xlabel("Elements (Titles Hidden)", style='italic', color='#64748B')
 
-        # --- CURVAS DE PARETO INDIVIDUAIS ---
         if self.chk_pareto.isChecked():
             self.pareto_ax = self.bar_ax.twinx()
             pareto_threshold = getattr(self.settings, 'pareto_threshold', 85.0)
@@ -851,10 +1060,8 @@ class ComparisonView(QWidget):
                     cum_perc = np.cumsum(case_vals) / total * 100
                     color = colors[c % len(colors)]
                     
-                    # Linha Fina do Caso
                     self.pareto_ax.plot(x, cum_perc, color=color, linewidth=1.5, linestyle='-', alpha=0.9)
                     
-                    # Limiar (Threshold)
                     idx_threshold = np.abs(cum_perc - pareto_threshold).argmin()
                     self.pareto_ax.plot(x[idx_threshold], cum_perc[idx_threshold], marker='o', markersize=6, color=color)
                     self.pareto_ax.annotate(
@@ -871,9 +1078,14 @@ class ComparisonView(QWidget):
                 
             self.pareto_ax.spines['top'].set_visible(False)
 
-        # Estética Final do Gráfico
         self.bar_ax.set_title(f"{ind} Distribution", pad=15, fontweight='bold', color='#1E293B', fontsize=14)
         
+        # CORREÇÃO AQUI: Se houver apenas 1 elemento (ex: Granularidade Global), trava os limites de X para que ele não fique "gordo" e ocupe toda a tela.
+        if len(element_names) == 1:
+            self.bar_ax.set_xlim(-0.8, 0.8)
+        elif len(element_names) > 1:
+            self.bar_ax.set_xlim(-0.5, len(element_names) - 0.5)
+
         if self.chk_show_y1.isChecked():
             self.bar_ax.set_ylabel(f"{ind} Value", fontweight='bold', color='#475569')
         else:
@@ -890,165 +1102,160 @@ class ComparisonView(QWidget):
         self.bar_ax.spines['left'].set_color('#CBD5E1')
         self.bar_ax.spines['bottom'].set_color('#CBD5E1')
         
-        # Legenda limpa
         self.bar_ax.legend(loc='upper right', fontsize=9, edgecolor='#CBD5E1', framealpha=0.9)
         
         self.bar_figure.tight_layout() 
         self.bar_canvas.draw()
 
     def setup_time_series_tab(self):
-        layout = QHBoxLayout(self.tab_time_series)
+        layout = QVBoxLayout(self.tab_time_series)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(15)
 
-        # Lado Esquerdo: Gráfico e Controles
-        left_panel = QVBoxLayout()
+        # Parte Superior: Gráfico (Esquerda) + Árvore (Direita)
+        top_split = QHBoxLayout()
         
-        controls_row = QHBoxLayout()
-        controls_row.addWidget(QLabel("<b>Y-Axis View:</b>"))
-        self.combo_ts_unit = QComboBox()
-        self.combo_ts_unit.addItems(["Power (MW) - Hourly", "Energy (MWh) - Cumulative"])
-        self.combo_ts_unit.currentIndexChanged.connect(self.plot_time_series)
-        controls_row.addWidget(self.combo_ts_unit)
-        controls_row.addStretch()
-        left_panel.addLayout(controls_row)
-
+        # Gráfico
         self.ts_figure = Figure(figsize=(8, 5), dpi=100, facecolor='#FFFFFF')
         self.ts_canvas = FigureCanvas(self.ts_figure)
         self.ts_ax = self.ts_figure.add_subplot(111)
-        left_panel.addWidget(self.ts_canvas, stretch=1)
+        top_split.addWidget(self.ts_canvas, stretch=4)
 
-        layout.addLayout(left_panel, stretch=3)
-
-        # Lado Direito: Árvore de Seleção (QTreeWidget)
-        right_panel = QGroupBox("Series Selection")
-        right_panel.setStyleSheet("QGroupBox { border: 1px solid #E2E8F0; border-radius: 6px; }")
-        right_layout = QVBoxLayout(right_panel)
-        
+        # Árvore de Seleção
         self.tree_series = QTreeWidget()
         self.tree_series.setHeaderHidden(True)
-        self.tree_series.setStyleSheet("""
-            QTreeWidget { border: none; background-color: transparent; }
-            QTreeWidget::item { padding: 4px; }
-        """)
+        self.tree_series.setFixedWidth(280)
         self.tree_series.itemChanged.connect(self.plot_time_series)
-        right_layout.addWidget(self.tree_series)
+        top_split.addWidget(self.tree_series, stretch=1)
 
-        layout.addWidget(right_panel, stretch=1)
+        layout.addLayout(top_split, stretch=1)
 
-        zoom_row = QHBoxLayout()
-        zoom_row.addWidget(QLabel("<b>X-Axis Range (Hours):</b>"))
+        # Rodapé: Controles de Eixo e Visualização
+        bottom_controls = QGroupBox()
+        bottom_controls.setStyleSheet("QGroupBox { border: 1px solid #E2E8F0; border-radius: 6px; background-color: #FFFFFF; }")
+        control_layout = QHBoxLayout(bottom_controls)
+        control_layout.setContentsMargins(15, 10, 15, 10)
 
-        # SpinBox para o Limite Inferior (A) - Valor padrão 0
+        control_layout.addWidget(QLabel("<b>Y-Axis View:</b>"))
+        self.combo_ts_unit = QComboBox()
+        self.combo_ts_unit.addItems(["Power (MW)", "Energy (Per Hour)"])
+        self.combo_ts_unit.currentIndexChanged.connect(self.plot_time_series)
+        control_layout.addWidget(self.combo_ts_unit)
+        
+        control_layout.addSpacing(40)
+
+        control_layout.addWidget(QLabel("<b>X-Axis Zoom (Hours):</b>"))
         self.spin_x_min = QSpinBox()
         self.spin_x_min.setRange(0, 8760)
         self.spin_x_min.setValue(0)
+        self.spin_x_min.setFixedWidth(90)
         self.spin_x_min.valueChanged.connect(self.update_x_axis_limits)
-        zoom_row.addWidget(self.spin_x_min)
+        control_layout.addWidget(self.spin_x_min)
 
-        zoom_row.addWidget(QLabel("até"))
+        control_layout.addWidget(QLabel("até"))
 
-        # SpinBox para o Limite Superior (B) - Valor padrão 8760
         self.spin_x_max = QSpinBox()
         self.spin_x_max.setRange(0, 8760)
-        self.spin_x_max.setValue(8760)
+        self.spin_x_max.setValue(240)
+        self.spin_x_max.setFixedWidth(90)
         self.spin_x_max.valueChanged.connect(self.update_x_axis_limits)
-        zoom_row.addWidget(self.spin_x_max)
+        control_layout.addWidget(self.spin_x_max)
 
-        zoom_row.addStretch()
-        left_panel.addLayout(zoom_row) # Adiciona ao painel esquerdo da aba
+        control_layout.addStretch()
+        layout.addWidget(bottom_controls)
 
     def render_time_series_data(self, ts_data: dict):
-        """Popula a árvore (QTreeWidget) com os dados recebidos do Use Case"""
         self.current_ts_data = ts_data.get("time_series", {})
         
         self.tree_series.blockSignals(True)
         self.tree_series.clear()
 
-        # Constrói a hierarquia Caso -> Séries
         for i, case_id in enumerate(self.case_ids_cache):
             case_name = self.case_names_cache[i]
             series_list = self.current_ts_data.get(str(case_id), [])
             
             if not series_list: continue
 
-            # Nó Pai (Nome do Caso)
             case_node = QTreeWidgetItem(self.tree_series, [case_name])
             case_node.setFlags(case_node.flags() | Qt.ItemFlag.ItemIsAutoTristate | Qt.ItemFlag.ItemIsUserCheckable)
-            case_node.setCheckState(0, Qt.CheckState.Checked)
+            case_node.setCheckState(0, Qt.CheckState.Unchecked)
             case_node.setExpanded(True)
             
-            # Nós Filhos (Séries de Carga daquele Caso)
             for idx, series in enumerate(series_list):
-                # Guarda os valores matemáticos dentro do nó usando o Qt.ItemDataRole
-                child_name = f"Series {idx + 1} ({series['unit_y']})"
+                real_name = series.get("series_name", f"Série {idx + 1}")
+                child_name = f"{real_name} ({series.get('unit_y', 'MW')})"
+                
                 child_node = QTreeWidgetItem(case_node, [child_name])
                 child_node.setFlags(child_node.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                child_node.setCheckState(0, Qt.CheckState.Checked)
+                child_node.setCheckState(0, Qt.CheckState.Unchecked)
                 child_node.setData(0, Qt.ItemDataRole.UserRole, series["values"])
 
         self.tree_series.blockSignals(False)
         self.plot_time_series()
 
     def plot_time_series(self, *args):
-        """Varre a árvore e plota as séries que estão marcadas"""
         self.ts_ax.clear()
         
         mode = self.combo_ts_unit.currentText()
-        is_cumulative = "Cumulative" in mode
+        is_energy = "Energy" in mode
         
         plotted_any = False
         colors = self.chart_colors if self.combo_color.currentText() == "Padrão (Tailwind)" else ['#000000', '#E69F00', '#56B4E9', '#009E73', '#F0E442']
 
-        # Itera sobre os nós pais (Casos)
+        def get_distinct_colors(base_hex, count):
+            """Gera sub-cores rotacionando o Matiz (Hue) da cor base"""
+            if count == 1: return [base_hex]
+            rgb = mcolors.hex2color(base_hex)
+            h, l, s = colorsys.rgb_to_hls(*rgb)
+            return [mcolors.rgb2hex(colorsys.hls_to_rgb((h + (i * 0.85 / count)) % 1.0, l, s)) for i in range(count)]
+
         for i in range(self.tree_series.topLevelItemCount()):
             case_node = self.tree_series.topLevelItem(i)
-            case_color = colors[i % len(colors)]
+            base_color = colors[i % len(colors)]
             
-            # Itera sobre os filhos (Séries)
-            for j in range(case_node.childCount()):
+            num_children = case_node.childCount()
+            sub_colors = get_distinct_colors(base_color, num_children)
+            
+            for j in range(num_children):
                 child_node = case_node.child(j)
+                child_node.setForeground(0, QColor(sub_colors[j]))
                 
                 if child_node.checkState(0) == Qt.CheckState.Checked:
                     raw_values = child_node.data(0, Qt.ItemDataRole.UserRole)
                     if not raw_values: continue
                     
                     y_vals = np.array(raw_values)
-                    if is_cumulative:
-                        y_vals = np.cumsum(y_vals)
+                    if is_energy:
+                        y_vals = y_vals * 3600
                         
                     x_vals = np.arange(len(y_vals))
-                    label = f"{case_node.text(0)} - {child_node.text(0)}"
+                    label = f"[{case_node.text(0)[:8]}...] {child_node.text(0)}"
                     
-                    # Usa transparência para diferenciar múltiplas séries do mesmo caso
-                    alpha_val = max(0.3, 1.0 - (j * 0.2)) 
-                    self.ts_ax.plot(x_vals, y_vals, color=case_color, alpha=alpha_val, linewidth=1.2, label=label)
+                    self.ts_ax.plot(x_vals, y_vals, color=sub_colors[j], linewidth=1.5, label=label)
                     plotted_any = True
 
         if plotted_any:
-            self.ts_ax.set_title("Load Profile Comparison", pad=15, fontweight='bold', color='#1E293B')
+            self.ts_ax.set_title("Load Profile Comparison", pad=15, fontweight='bold', color='#1E293B', fontsize=14)
             self.ts_ax.set_xlabel("Time (Hours)", fontweight='bold')
-            self.ts_ax.set_ylabel("Energy (MWh)" if is_cumulative else "Power (MW)", fontweight='bold')
+            self.ts_ax.set_ylabel("Energy (Joules)" if is_energy else "Power (MW)", fontweight='bold')
             self.ts_ax.grid(True, linestyle='--', alpha=0.3)
             self.ts_ax.spines['top'].set_visible(False)
             self.ts_ax.spines['right'].set_visible(False)
-            self.ts_ax.legend(loc='best', fontsize=8, framealpha=0.9)
             self.ts_ax.set_xlim(self.spin_x_min.value(), self.spin_x_max.value())
+            
+            self.ts_ax.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), fontsize=9, edgecolor='#CBD5E1', framealpha=0.9)
+            self.ts_figure.subplots_adjust(right=0.7)
+        else:
+            self.ts_figure.subplots_adjust(right=0.95)
 
-        self.ts_figure.tight_layout()
         self.ts_canvas.draw()
 
     def update_x_axis_limits(self):
-        """Atualiza dinamicamente os limites do eixo X com base nos SpinBoxes A e B"""
         x_min = self.spin_x_min.value()
         x_max = self.spin_x_max.value()
         
-        # Garante que A não seja maior que B para evitar inversão no gráfico
         if x_min >= x_max:
             return
 
-        # Aplica o novo domínio [A, B] no eixo X do Matplotlib
         self.ts_ax.set_xlim(x_min, x_max)
-        
-        # Redesenha o canvas de forma otimizada
         self.ts_canvas.draw()

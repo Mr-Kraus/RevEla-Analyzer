@@ -7,11 +7,11 @@ from app.ingestion.parsers.raw_dtos import RawReliabilityIndicesDTO
 
 logger = logging.getLogger(__name__)
 
-
 class ReliabilityIndicesParser(BaseParser):
     """
     Parser para resultados finais de confiabilidade.
     Extrai blocos de índices, anos simulados e intervalos de confiança.
+    Suporta nativamente o padrão RELEVA e os novos blocos do PSMora.
     """
 
     def parse(self, file_path: Path) -> RawReliabilityIndicesDTO:
@@ -50,7 +50,7 @@ class ReliabilityIndicesParser(BaseParser):
                     partes = line.split(';')
                     if len(partes) > 3 and partes[3].strip(): confidence_intervals["LOLF"] = partes[3].strip()
 
-                # --- LÓGICA ORIGINAL DE BLOCOS MATRICIAIS ---
+                # --- LÓGICA DE BLOCOS MATRICIAIS ---
                 if not line:
                     current_anchor = None
                     continue
@@ -71,7 +71,18 @@ class ReliabilityIndicesParser(BaseParser):
                     current_anchor = "BY_BUS"
                     blocks[current_anchor] = []
                     continue
+                    
+                # ---> NOVAS ÂNCORAS DO PSMORA ADICIONADAS AQUI <---
+                elif "Generation Well-being Indices:" in line:
+                    current_anchor = "GENERATION_WELL_BEING"
+                    blocks[current_anchor] = []
+                    continue
+                elif "Reserve Requirement Risk Indices:" in line:
+                    current_anchor = "RESERVE_REQUIREMENT_RISK"
+                    blocks[current_anchor] = []
+                    continue
 
+                # Se estiver dentro de uma âncora, captura a linha e limpa
                 if current_anchor:
                     parts = line.split(";")
                     clean_parts = [

@@ -37,7 +37,7 @@ class CasesViewModel(QObject):
         self.import_started.emit()
         folder_name = os.path.basename(folder_path)
         
-        # Salve a versão na classe para usarmos no próximo passo (on_case_registered)
+        # Salva a versão na classe para usarmos no próximo passo
         self.current_software_version = software_version 
         
         payload = {
@@ -58,9 +58,10 @@ class CasesViewModel(QObject):
                 data = resp_data.get("data", {})
                 self.current_case_id = data.get("id")
                 
-                # 2. Envie a versão selecionada no corpo da requisição de importação
-                import_payload = {"software_version": self.current_software_version}
+                # Monta o payload enviando a versão selecionada para a Rota do FastAPI
+                import_payload = {"software_version": getattr(self, 'current_software_version', 'RELEVA')}
                 
+                # Dispara a requisição de Ingestão
                 self._ingest_worker = self.api_client.make_request_async(
                     "POST", 
                     f"/cases/{self.current_case_id}/import",

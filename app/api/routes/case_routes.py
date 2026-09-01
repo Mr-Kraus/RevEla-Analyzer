@@ -1,22 +1,25 @@
-from pydantic import BaseModel
-from typing import List, Optional
-from fastapi import HTTPException
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from typing import List
-from os import Path 
 import uuid
-from app.infrastructure.database.models.simulation_model import SimulationRunModel
+from typing import List, Optional
+from pathlib import Path  # <-- CORRIGIDO AQUI (era from os import Path)
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.api.dependencies.db_dependency import get_db
 from app.api.dependencies.auth_dependency import get_current_user
-from app.infrastructure.database.models.security_model import UserModel
 from app.api.schemas.base_schema import APIResponse
 from app.api.schemas.case_schema import CaseCreateRequest, CaseResponse
-from app.application.services.case_service import CaseService
 from app.application.pipelines.case_ingestion_pipeline import CaseIngestionPipeline
+from app.application.services.case_service import CaseService
+
+# ---> IMPORTS DOS MODELOS CORRIGIDOS AQUI <---
 from app.infrastructure.database.models.case_model import CaseModel
+from app.infrastructure.database.models.simulation_model import SimulationRunModel
+from app.infrastructure.database.models.security_model import UserModel
+from app.infrastructure.database.models.region_model import RegionModel
+from app.infrastructure.database.models.system_model import SystemModel
 
 router = APIRouter(prefix="/cases", tags=["Case Management"])
 
@@ -150,6 +153,8 @@ def update_region_aliases(
     db.commit()
     return APIResponse(success=True, data={}, message="Apelidos das regiões atualizados.")
 
+
+# ---> NOVA ROTA DE IMPORTAÇÃO COM SOFTWARE VERSION <---
 class CaseImportRequest(BaseModel):
     software_version: str = "RELEVA"
 
@@ -179,7 +184,7 @@ def import_case_files(
         case_id=case_id, 
         simulation_run_id=simulation_run_id, 
         case_folder=Path(case_model.source_path),
-        software_version=payload.software_version  # <--- NOVA INJEÇÃO AQUI
+        software_version=payload.software_version
     )
     
     if success:

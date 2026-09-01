@@ -3,9 +3,12 @@ from typing import Dict, Any, List
 from dataclasses import dataclass, field
 
 
-class RawSettingsDTO(BaseModel):
-    """Representa os dados brutos extraídos do Template Settings.csv (Key-Value)."""
-    parameters: Dict[str, Any]
+@dataclass
+class RawSettingsDTO:
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    analysis_type: str = "N/A"
+    system_representation: str = "N/A"
+    convergence_beta: str = "N/A"
 
 class RawSystemBlockDTO(BaseModel):
     """Representa um bloco bruto extraído do Template System.csv (ex: BARRAS)."""

@@ -11,12 +11,14 @@ class IndicatorDTO(BaseModel):
     unit: str
     category: str
     description: str = ""
+    confidence_interval: Optional[float] = None
 
 # --- 2. DTO de Análise Global ---
 class GlobalAnalysisDTO(BaseModel):
     simulation_id: uuid.UUID
     case_name: str
     indicators: Dict[str, IndicatorDTO]
+    case_informations: Dict[str, Any] = Field(default_factory=dict)
 
 # --- 3. DTOs de Ranking ---
 class RankingItemDTO(BaseModel):

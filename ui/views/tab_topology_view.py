@@ -51,51 +51,64 @@ class TabTopologyView(QWidget):
 
         nx_graph = nx.Graph()
 
+        # 1. ESTILIZAÇÃO DOS NÓS (BARRAS E GERADORES)
         for node in nodes:
             node_id = str(node.get("id"))
             label = str(node.get("label", node_id))
             title = node.get("title", "")
             group = str(node.get("group", "load"))
-            color = "#27AE60" if group.lower() == "generation" else "#3498DB"
-            nx_graph.add_node(node_id, label=label, title=title, color=color, size=24)
+            
+            # Diferenciação Visual
+            if group.lower() == "generation":
+                color = "#F59E0B"   # Laranja para Geração
+                shape = "hexagon"   # Formato Hexagonal
+                size = 35           # Tamanho maior para destacar
+            else:
+                color = "#3498DB"   # Azul para Carga/Barra Comum
+                shape = "dot"       # Formato circular padrão
+                size = 20
 
+            nx_graph.add_node(node_id, label=label, title=title, color=color, size=size, shape=shape)
+
+        # 2. ESTILIZAÇÃO DAS ARESTAS (LINHAS E TRAFOS)
         for edge in edges:
             u = str(edge.get("from"))
             v = str(edge.get("to"))
             label = str(edge.get("label", ""))
             title = edge.get("title", "")
+            
+            # Verifica o tipo de conexão (assumindo que seu viewmodel repassa essa flag)
+            edge_type = str(edge.get("type", "")) 
+
             if u and v and u != "None" and v != "None":
-                nx_graph.add_edge(u, v, title=title, label=label, color="#7F8C8D", width=2)
+                if edge_type.lower() == "transformer" or "trafo" in title.lower() or "trafo" in label.lower():
+                    # Transformadores: Linhas verdes e Tracejadas
+                    nx_graph.add_edge(u, v, title=title, label=label, color="#10B981", width=2.5, dashes=True)
+                else:
+                    # Linhas de Transmissão: Linhas cinzas contínuas
+                    nx_graph.add_edge(u, v, title=title, label=label, color="#94A3B8", width=1.5)
 
         net = Network(height="100%", width="100%", bgcolor="#F5F6FA", font_color="#2C3E50", cdn_resources="remote")
         net.from_nx(nx_graph)
         
+        # 3. MOTOR DE FÍSICA OTIMIZADO PARA REDES GIGANTES (JSON ESTRITO)
         net.set_options("""
-        var options = {
-          "nodes": {
-            "font": {"size": 15, "color": "#2C3E50", "background": "rgba(255, 255, 255, 0.85)", "strokeWidth": 2},
-            "borderWidth": 2
-          },
-          "edges": {
-            "color": {"color": "#bdc3c7", "highlight": "#E74C3C", "hover": "#E74C3C"},
-            "width": 1.5,
-            "smooth": {"enabled": true, "type": "continuous"}
-          },
-          "physics": {
-            "barnesHut": {
-              "gravitationalConstant": -4000,
-              "centralGravity": 0.1,
-              "springLength": 250,
-              "springConstant": 0.04,
-              "avoidOverlap": 1
-            },
-            "minVelocity": 0.75,
-            "solver": "barnesHut"
-          },
-          "interaction": {
-             "navigationButtons": true,
-             "hover": true
-          }
+        {
+            "physics": {
+                "solver": "forceAtlas2Based",
+                "forceAtlas2Based": {
+                    "gravitationalConstant": -100,
+                    "centralGravity": 0.005,
+                    "springLength": 150,
+                    "springConstant": 0.05
+                },
+                "stabilization": {
+                    "enabled": true,
+                    "iterations": 2000,
+                    "updateInterval": 50,
+                    "fit": true
+                }
+            }
         }
         """)
 
@@ -158,8 +171,24 @@ class TabTopologyView(QWidget):
             </div>
             """
 
+            # 4. EVENTOS JS PARA DESLIGAR A FÍSICA
             custom_js = """
             <script type="text/javascript">
+                
+                // --- CONGELAMENTO DA REDE ---
+                // Evento 1: Desliga a gravidade assim que a tela terminar de calcular (2000 iterações invisíveis)
+                network.on("stabilizationIterationsDone", function () {
+                    network.setOptions({ physics: false });
+                });
+
+                // Evento 2: Se o usuário clicar e arrastar qualquer nó durante ou após a animação, 
+                // congela a física imediatamente para garantir fluidez total.
+                network.on("dragStart", function (params) {
+                    if (params.nodes.length > 0) {
+                        network.setOptions({ physics: false });
+                    }
+                });
+
                 // Popula as opções de autocompletar na barra de busca
                 setTimeout(function() {
                     var datalist = document.getElementById('node-datalist');
@@ -169,9 +198,8 @@ class TabTopologyView(QWidget):
                         option.value = n.label;
                         datalist.appendChild(option);
                     });
-                }, 1000); // Aguarda o gráfico renderizar
+                }, 1000); 
 
-                // Lógica de Busca e Viagem da Câmera
                 function searchNode() {
                     var searchTerm = document.getElementById('search-input').value.toLowerCase();
                     var foundNode = null;
@@ -186,14 +214,12 @@ class TabTopologyView(QWidget):
                     }
 
                     if (foundNode) {
-                        // Faz a câmera viajar até a barra
                         network.focus(foundNode, {
                             scale: 1.5,
                             animation: { duration: 1000, easingFunction: "easeInOutQuad" }
                         });
                         network.selectNodes([foundNode]);
                         
-                        // Abre o painel automaticamente simulando o clique
                         var nodeObj = nodes.get(foundNode);
                         document.getElementById('info-title').innerHTML = "Barra: " + (nodeObj.label || foundNode);
                         document.getElementById('info-content').innerHTML = nodeObj.title || "Sem informações.";
@@ -203,14 +229,12 @@ class TabTopologyView(QWidget):
                     }
                 }
 
-                // Permite usar a tecla Enter para buscar
                 document.getElementById('search-input').addEventListener('keypress', function (e) {
                     if (e.key === 'Enter') {
                         searchNode();
                     }
                 });
 
-                // Painel de Clique Normal
                 network.on("click", function (params) {
                     var panel = document.getElementById("info-panel");
                     var titleEl = document.getElementById("info-title");

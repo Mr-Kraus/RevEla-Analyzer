@@ -151,7 +151,7 @@ class CaseDetailCard(QGroupBox):
 
 class ComparativeTable(QTableWidget):
     """
-    Componente Concreto para o Tipo 2: Tabela gigante comparando Múltiplos Casos Lado a Lado.
+    Componente Concreto para o Tipo 2: Tabela comparando Múltiplos Casos Lado a Lado.
     """
     def __init__(self, data_list: list, settings: SettingsService):
         super().__init__()
