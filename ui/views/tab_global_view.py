@@ -20,7 +20,7 @@ class CaseDetailCard(QGroupBox):
     def __init__(self, data: dict, settings: SettingsService):
         super().__init__()
         case_name = data.get("case_name", "Desconhecido")
-        self.setTitle(f"📊 Caso: {case_name}")
+        self.setTitle(f"Case: {case_name}")
         
         # Estilização do Card (Fundo branco, borda suave e sombra simulada)
         self.setStyleSheet("""
@@ -47,7 +47,7 @@ class CaseDetailCard(QGroupBox):
 
         # 1. Tabela Principal (Indicadores)
         self.table_ind = QTableWidget(len(data["indicators"]), 4)
-        self.table_ind.setHorizontalHeaderLabels([f"Indicadores ({case_name})", "Unidade", "Valor", "Interv. Confiança"])
+        self.table_ind.setHorizontalHeaderLabels([f"Indicators ({case_name})", "Unit", "Value", "Conf. Interval"])
         self._apply_modern_style(self.table_ind)
 
         for row, (key, info) in enumerate(data["indicators"].items()):
@@ -83,7 +83,7 @@ class CaseDetailCard(QGroupBox):
 
         # 2. Tabela Menor (Informações Gerais)
         self.table_info = QTableWidget(len(data["general_info"]), 2)
-        self.table_info.setHorizontalHeaderLabels(["Informação Geral", "Valor"])
+        self.table_info.setHorizontalHeaderLabels(["General Information", "Value"])
         self._apply_modern_style(self.table_info)
 
         for row, (key, val) in enumerate(data["general_info"].items()):
@@ -265,17 +265,17 @@ class TabGlobalView(QWidget):
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setSpacing(15)
 
-        lbl_config = QLabel("⚙️ Visualização da Aba")
+        lbl_config = QLabel("⚙️ View Mode")
         lbl_config.setStyleSheet("font-weight: bold; color: #2C3E50; border: none; font-size: 14px;")
         
         self.combo_view_type = QComboBox()
         self.combo_view_type.addItems([
-            "Tipo 1: Detalhado (Painéis Rolantes)", 
-            "Tipo 2: Comparativo (Tabela Consolidada)"
+            "Scroll Table", 
+            "Only Table"
         ])
         self.combo_view_type.setStyleSheet("padding: 8px; border: 1px solid #BDC3C7; border-radius: 4px;")
 
-        lbl_cases = QLabel("📂 Casos Selecionados:")
+        lbl_cases = QLabel("📂 Selected Cases:")
         lbl_cases.setStyleSheet("font-weight: bold; color: #2C3E50; border: none; margin-top: 10px;")
 
         self.list_cases = QListWidget()

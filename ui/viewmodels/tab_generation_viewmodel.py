@@ -18,6 +18,17 @@ class TabGenerationViewModel(QObject):
     def _on_data_loaded(self, response):
         if response.status_code == 200:
             data = response.json().get("data", {})
+            if "generators" in data:
+                data["generators"] = [
+                    gen for gen in data["generators"] 
+                    if float(gen.get("nominal_capacity_mw", 0) or 0) < 9999
+                ]
+                
+            if "generator_classes" in data:
+                data["generator_classes"] = [
+                    gc for gc in data["generator_classes"] 
+                    if float(gc.get("nominal_capacity_mw", 0) or 0) < 9999
+                ]
             self.generation_data_ready.emit(data)
         else:
             self.error_occurred.emit(f"Falha ao carregar dados de geração ({response.status_code})")

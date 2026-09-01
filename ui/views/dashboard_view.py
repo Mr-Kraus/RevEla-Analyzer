@@ -25,10 +25,10 @@ class DashboardView(QWidget):
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(20)
 
-        self.card_total = self.create_stat_card("Casos Cadastrados", "-")
-        self.card_ready = self.create_stat_card("Casos Prontos", "-")
-        self.card_date = self.create_stat_card("Última Importação", "-")
-        self.card_db = self.create_stat_card("Status do Banco", "Verificando...")
+        self.card_total = self.create_stat_card("Cases Registered", "-")
+        self.card_ready = self.create_stat_card("Cases Ready", "-")
+        self.card_date = self.create_stat_card("Last Import", "-")
+        self.card_db = self.create_stat_card("Database Status", "Checking...")
 
         cards_layout.addWidget(self.card_total)
         cards_layout.addWidget(self.card_ready)
@@ -40,12 +40,12 @@ class DashboardView(QWidget):
         # ==========================================
         # TABELA DE CASOS RECENTES
         # ==========================================
-        subtitle = QLabel("Casos Recentes")
+        subtitle = QLabel("Recent Cases")
         subtitle.setStyleSheet("font-size: 18px; font-weight: bold; color: #34495E; margin-top: 20px;")
         layout.addWidget(subtitle)
 
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Nome", "Descrição", "Status", "ID"])
+        self.table.setHorizontalHeaderLabels(["Name", "Description", "Status", "ID"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setStyleSheet("""

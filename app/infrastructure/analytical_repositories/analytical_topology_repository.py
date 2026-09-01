@@ -1,11 +1,15 @@
 import uuid
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import select, or_
-from sqlalchemy import func
+from sqlalchemy import select, or_, func
 from app.infrastructure.database.models.region_model import RegionModel
 from app.infrastructure.database.models.bus_model import BusModel
-from app.infrastructure.database.models.equipment_model import GeneratorModel, TransmissionLineModel, TransformerModel
+from app.infrastructure.database.models.equipment_model import (
+    GeneratorModel, 
+    GeneratorClassModel, 
+    TransmissionLineModel, 
+    TransformerModel
+)
 from app.infrastructure.database.models.system_model import SystemModel
 from app.infrastructure.database.models.reliability_result_model import ReliabilityResultModel
 
@@ -15,14 +19,20 @@ class AnalyticalTopologyRepository:
     def __init__(self, session: Session):
         self.session = session
 
+    def _get_sys_id(self, case_id: uuid.UUID):
+        """Método auxiliar para resolver o ID do sistema seja por case_id ou simulation_run_id."""
+        stmt = select(SystemModel.id).where(SystemModel.case_id == case_id)
+        sys_id = self.session.execute(stmt).scalar_one_or_none()
+        if not sys_id:
+            stmt = select(SystemModel.id).where(SystemModel.simulation_run_id == case_id)
+            sys_id = self.session.execute(stmt).scalar_one_or_none()
+        return sys_id
+
     def get_topology(self, case_id: uuid.UUID) -> dict:
-        # 1. TRUQUE MESTRE: O Front-end manda o case_id, mas precisamos do simulation_run_id!
-        # Vamos consultar a tabela SystemModel que guarda o mapeamento correto.
         stmt_info = select(SystemModel.id, SystemModel.simulation_run_id).where(SystemModel.case_id == case_id)
         sys_info = self.session.execute(stmt_info).first()
         
         if not sys_info:
-            # Fallback de segurança caso a rota tenha enviado um simulation_run_id direto
             stmt_info = select(SystemModel.id, SystemModel.simulation_run_id).where(SystemModel.simulation_run_id == case_id)
             sys_info = self.session.execute(stmt_info).first()
             if not sys_info:
@@ -31,7 +41,6 @@ class AnalyticalTopologyRepository:
         sys_id = sys_info[0]
         sim_run_id = sys_info[1]
 
-        # 2. BUSCA AS BARRAS E SEUS INDICADORES COMPLETOS (Agora cruzando o UUID certo)
         region_display = func.coalesce(RegionModel.alias, RegionModel.name).label("region_name")
 
         stmt_buses = (
@@ -55,8 +64,6 @@ class AnalyticalTopologyRepository:
         buses_results = self.session.execute(stmt_buses).all()
 
         nodes = []
-        
-        # Função auxiliar para garantir que não teremos erros de formatação de strings no Python
         def safe_fmt(val, dec=4): return f"{float(val or 0):.{dec}f}"
 
         for row in buses_results:
@@ -80,7 +87,6 @@ class AnalyticalTopologyRepository:
                 "title": title_html 
             })
 
-        # 3. BUSCA AS ARESTAS COM ATRIBUTOS ELÉTRICOS
         FromBus = aliased(BusModel)
         ToBus = aliased(BusModel)
         edges = []
@@ -96,6 +102,7 @@ class AnalyticalTopologyRepository:
             .join(FromBus, TransmissionLineModel.from_bus_id == FromBus.id)
             .join(ToBus, TransmissionLineModel.to_bus_id == ToBus.id)
             .where(TransmissionLineModel.system_id == sys_id)
+            .where(TransmissionLineModel.capacity_mva < 9999)
         )
         lines_results = self.session.execute(stmt_lines).all()
 
@@ -124,6 +131,7 @@ class AnalyticalTopologyRepository:
             .join(FromBus, TransformerModel.from_bus_id == FromBus.id)
             .join(ToBus, TransformerModel.to_bus_id == ToBus.id)
             .where(TransformerModel.system_id == sys_id)
+            .where(TransformerModel.capacity_mva < 9999)
         )
         trafos_results = self.session.execute(stmt_trafos).all()
 
@@ -143,43 +151,27 @@ class AnalyticalTopologyRepository:
 
         return {"nodes": nodes, "edges": edges}
 
-    # Métodos genéricos mantidos para evitar quebras em outras rotas
     def get_transmission_details(self, case_id: uuid.UUID) -> dict:
-        """
-        Retorna os detalhes completos das Linhas de Transmissão e Transformadores
-        vinculados ao caso para exibição em tabela e cards.
-        """
-        stmt_info = select(SystemModel.id).where(SystemModel.case_id == case_id)
-        sys_id = self.session.execute(stmt_info).scalar_one_or_none()
-        
+        sys_id = self._get_sys_id(case_id)
         if not sys_id:
-            stmt_info = select(SystemModel.id).where(SystemModel.simulation_run_id == case_id)
-            sys_id = self.session.execute(stmt_info).scalar_one_or_none()
-            if not sys_id:
-                return {"summary": {}, "lines": [], "transformers": []}
+            return {"summary": {}, "lines": [], "transformers": []}
 
         FromBus = aliased(BusModel)
         ToBus = aliased(BusModel)
 
-        # 1. LINHAS DE TRANSMISSÃO
         stmt_lines = (
             select(
-                TransmissionLineModel.external_id,
-                TransmissionLineModel.name,
-                FromBus.name.label("from_bus_name"),
-                FromBus.external_id.label("from_bus_ext"),
-                ToBus.name.label("to_bus_name"),
-                ToBus.external_id.label("to_bus_ext"),
-                TransmissionLineModel.r_pu,
-                TransmissionLineModel.x_pu,
-                TransmissionLineModel.capacity_mva,
-                TransmissionLineModel.failure_rate,
-                TransmissionLineModel.repair_time
+                TransmissionLineModel.external_id, TransmissionLineModel.name,
+                FromBus.name.label("from_bus_name"), FromBus.external_id.label("from_bus_ext"),
+                ToBus.name.label("to_bus_name"), ToBus.external_id.label("to_bus_ext"),
+                TransmissionLineModel.r_pu, TransmissionLineModel.x_pu,
+                TransmissionLineModel.capacity_mva, TransmissionLineModel.failure_rate, TransmissionLineModel.repair_time
             )
             .select_from(TransmissionLineModel)
             .join(FromBus, TransmissionLineModel.from_bus_id == FromBus.id)
             .join(ToBus, TransmissionLineModel.to_bus_id == ToBus.id)
             .where(TransmissionLineModel.system_id == sys_id)
+            .where(TransmissionLineModel.capacity_mva < 9999)
         )
         lines_raw = self.session.execute(stmt_lines).all()
 
@@ -193,36 +185,26 @@ class AnalyticalTopologyRepository:
             total_line_mva += cap
             total_line_failure += fail
             lines.append({
-                "external_id": str(r.external_id),
-                "name": str(r.name or r.external_id),
+                "external_id": str(r.external_id), "name": str(r.name or r.external_id),
                 "from_bus": f"{r.from_bus_name} ({r.from_bus_ext})",
                 "to_bus": f"{r.to_bus_name} ({r.to_bus_ext})",
-                "r_pu": float(r.r_pu or 0.0),
-                "x_pu": float(r.x_pu or 0.0),
-                "capacity_mva": cap,
-                "failure_rate": fail,
-                "repair_time": float(r.repair_time or 0.0)
+                "r_pu": float(r.r_pu or 0.0), "x_pu": float(r.x_pu or 0.0),
+                "capacity_mva": cap, "failure_rate": fail, "repair_time": float(r.repair_time or 0.0)
             })
 
-        # 2. TRANSFORMADORES
         stmt_trafos = (
             select(
-                TransformerModel.external_id,
-                TransformerModel.name,
-                FromBus.name.label("from_bus_name"),
-                FromBus.external_id.label("from_bus_ext"),
-                ToBus.name.label("to_bus_name"),
-                ToBus.external_id.label("to_bus_ext"),
-                TransformerModel.r_pu,
-                TransformerModel.x_pu,
-                TransformerModel.capacity_mva,
-                TransformerModel.failure_rate,
-                TransformerModel.repair_time
+                TransformerModel.external_id, TransformerModel.name,
+                FromBus.name.label("from_bus_name"), FromBus.external_id.label("from_bus_ext"),
+                ToBus.name.label("to_bus_name"), ToBus.external_id.label("to_bus_ext"),
+                TransformerModel.r_pu, TransformerModel.x_pu,
+                TransformerModel.capacity_mva, TransformerModel.failure_rate, TransformerModel.repair_time
             )
             .select_from(TransformerModel)
             .join(FromBus, TransformerModel.from_bus_id == FromBus.id)
             .join(ToBus, TransformerModel.to_bus_id == ToBus.id)
             .where(TransformerModel.system_id == sys_id)
+            .where(TransformerModel.capacity_mva < 9999)
         )
         trafos_raw = self.session.execute(stmt_trafos).all()
 
@@ -233,60 +215,46 @@ class AnalyticalTopologyRepository:
             cap = float(r.capacity_mva or 0.0)
             total_trafo_mva += cap
             transformers.append({
-                "external_id": str(r.external_id),
-                "name": str(r.name or r.external_id),
+                "external_id": str(r.external_id), "name": str(r.name or r.external_id),
                 "from_bus": f"{r.from_bus_name} ({r.from_bus_ext})",
                 "to_bus": f"{r.to_bus_name} ({r.to_bus_ext})",
-                "r_pu": float(r.r_pu or 0.0),
-                "x_pu": float(r.x_pu or 0.0),
-                "capacity_mva": cap,
-                "failure_rate": float(r.failure_rate or 0.0),
-                "repair_time": float(r.repair_time or 0.0)
+                "r_pu": float(r.r_pu or 0.0), "x_pu": float(r.x_pu or 0.0),
+                "capacity_mva": cap, "failure_rate": float(r.failure_rate or 0.0), "repair_time": float(r.repair_time or 0.0)
             })
 
-        # Summary KPIs
-        total_equipments = len(lines) + len(transformers)
         avg_failure = (total_line_failure / len(lines)) if lines else 0.0
 
         return {
             "summary": {
-                "total_lines": len(lines),
-                "total_transformers": len(transformers),
-                "total_capacity_mva": round(total_line_mva + total_trafo_mva, 2),
-                "avg_failure_rate": round(avg_failure, 4)
+                "total_lines": len(lines), "total_transformers": len(transformers),
+                "total_capacity_mva": round(total_line_mva + total_trafo_mva, 2), "avg_failure_rate": round(avg_failure, 4)
             },
-            "lines": lines,
-            "transformers": transformers
+            "lines": lines, "transformers": transformers
         }
-    def get_generation_details(self, case_id: uuid.UUID) -> dict:
-        """
-        Retorna os detalhes completos dos Geradores (Parque Gerador)
-        vinculados ao caso para exibição em tabela e cards.
-        """
-        stmt_info = select(SystemModel.id).where(SystemModel.case_id == case_id)
-        sys_id = self.session.execute(stmt_info).scalar_one_or_none()
-        
-        if not sys_id:
-            stmt_info = select(SystemModel.id).where(SystemModel.simulation_run_id == case_id)
-            sys_id = self.session.execute(stmt_info).scalar_one_or_none()
-            if not sys_id:
-                return {"summary": {}, "generators": []}
 
-        # BUSCA OS GERADORES (Fazendo Outer Join com a Barra para o caso de não estar vinculado)
+    def get_generation_details(self, case_id: uuid.UUID) -> dict:
+        """Retorna as instâncias individuais e suas respectivas classes."""
+        sys_id = self._get_sys_id(case_id)
+        if not sys_id:
+            return {"summary": {}, "generators": []}
+
+        # Cruzamento corrigido: Instância -> Catálogo -> Barra
         stmt_gen = (
             select(
                 GeneratorModel.external_id,
                 GeneratorModel.name,
                 GeneratorModel.technology,
-                GeneratorModel.nominal_capacity_mw,
-                GeneratorModel.failure_rate_percent,
-                GeneratorModel.repair_time_hours,
+                GeneratorClassModel.nominal_capacity_mw,
+                GeneratorClassModel.failure_rate_percent,
+                GeneratorClassModel.repair_time_hours,
                 BusModel.name.label("bus_name"),
                 BusModel.external_id.label("bus_ext")
             )
             .select_from(GeneratorModel)
+            .join(GeneratorClassModel, GeneratorModel.generator_class_id == GeneratorClassModel.id)
             .outerjoin(BusModel, GeneratorModel.bus_id == BusModel.id)
             .where(GeneratorModel.system_id == sys_id)
+            .where(GeneratorClassModel.nominal_capacity_mw < 9999)
         )
         gens_raw = self.session.execute(stmt_gen).all()
 
@@ -322,5 +290,74 @@ class AnalyticalTopologyRepository:
             },
             "generators": generators
         }
-    def get_lines(self, sim_id): return []
-    def get_transformers(self, sim_id): return []
+
+    def get_power_plants_summary(self, case_id: uuid.UUID) -> list:
+        """Agrupa os geradores por Barra e Tecnologia para representar Usinas (Power Plants)."""
+        sys_id = self._get_sys_id(case_id)
+        if not sys_id:
+            return []
+
+        stmt = (
+            select(
+                BusModel.name.label("bus_name"),
+                BusModel.external_id.label("bus_ext"),
+                GeneratorModel.technology,
+                func.count(GeneratorModel.id).label("unit_count"),
+                func.sum(GeneratorClassModel.nominal_capacity_mw).label("total_capacity")
+            )
+            .select_from(GeneratorModel)
+            .join(GeneratorClassModel, GeneratorModel.generator_class_id == GeneratorClassModel.id)
+            .outerjoin(BusModel, GeneratorModel.bus_id == BusModel.id)
+            .where(GeneratorModel.system_id == sys_id)
+            .where(GeneratorClassModel.nominal_capacity_mw < 9999)
+            .group_by(BusModel.name, BusModel.external_id, GeneratorModel.technology)
+        )
+        plants_raw = self.session.execute(stmt).all()
+        
+        return [
+            {
+                "power_plant_name": f"Usina {r.technology} - {r.bus_name or 'Desconhecida'}",
+                "bus": f"{r.bus_name} ({r.bus_ext})" if r.bus_ext else "Não Vinculada",
+                "technology": r.technology,
+                "unit_count": r.unit_count,
+                "total_capacity_mw": float(r.total_capacity or 0.0)
+            } for r in plants_raw
+        ]
+
+    def get_energy_matrix(self, case_id: uuid.UUID) -> dict:
+        """Retorna a matriz energética consolidada (Soma de Capacidade por Tecnologia)."""
+        sys_id = self._get_sys_id(case_id)
+        if not sys_id:
+            return {}
+
+        stmt = (
+            select(
+                GeneratorModel.technology,
+                func.count(GeneratorModel.id).label("total_units"),
+                func.sum(GeneratorClassModel.nominal_capacity_mw).label("total_capacity")
+            )
+            .select_from(GeneratorModel)
+            .join(GeneratorClassModel, GeneratorModel.generator_class_id == GeneratorClassModel.id)
+            .where(GeneratorModel.system_id == sys_id)
+            .where(GeneratorClassModel.nominal_capacity_mw < 9999)
+            .group_by(GeneratorModel.technology)
+            .order_by(func.sum(GeneratorClassModel.nominal_capacity_mw).desc())
+        )
+        matrix_raw = self.session.execute(stmt).all()
+        
+        matrix = []
+        system_total_mw = sum(float(r.total_capacity or 0.0) for r in matrix_raw)
+
+        for r in matrix_raw:
+            cap = float(r.total_capacity or 0.0)
+            matrix.append({
+                "technology": r.technology,
+                "total_units": r.total_units,
+                "capacity_mw": round(cap, 2),
+                "participation_percent": round((cap / system_total_mw * 100) if system_total_mw > 0 else 0, 2)
+            })
+
+        return {
+            "total_system_capacity": round(system_total_mw, 2),
+            "breakdown": matrix
+        }

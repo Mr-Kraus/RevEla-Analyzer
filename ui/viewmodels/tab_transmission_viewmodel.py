@@ -18,6 +18,18 @@ class TabTransmissionViewModel(QObject):
     def _on_data_loaded(self, response):
         if response.status_code == 200:
             data = response.json().get("data", {})
+            if "transmission_lines" in data:
+                data["transmission_lines"] = [
+                    line for line in data["transmission_lines"] 
+                    if float(line.get("capacity_mva", 0) or 0) < 9999
+                ]
+                
+            # FILTRO DE MODELAGEM: Remove trafos fictícios/infinitos
+            if "transformers" in data:
+                data["transformers"] = [
+                    trafo for trafo in data["transformers"] 
+                    if float(trafo.get("capacity_mva", 0) or 0) < 9999
+                ]
             self.transmission_data_ready.emit(data)
         else:
             self.error_occurred.emit(f"Falha ao carregar dados de transmissão ({response.status_code})")

@@ -300,9 +300,9 @@ class CasesView(QWidget):
             QMenu::item:selected { background-color: #F8FAFC; color: #2563EB; font-weight: bold; }
         """)
 
-        action_analyze = menu.addAction("📊 Analisar Caso")
-        action_edit = menu.addAction("⚙️ Editar Configurações")
-        action_delete = menu.addAction("🗑️ Excluir")
+        action_analyze = menu.addAction("📊 Detailed Analysis")
+        action_edit = menu.addAction("⚙️ Edit")
+        action_delete = menu.addAction("🗑️ Delete")
 
         # Posição do menu colado abaixo do botão
         pos = button.mapToGlobal(button.rect().bottomLeft())
@@ -317,7 +317,7 @@ class CasesView(QWidget):
             self.edit_case(case_id, case_name) 
             
         elif selected_action == action_delete:
-            confirm = QMessageBox.question(self, "Confirmar Exclusão", f"Tem certeza que deseja excluir o caso '{case_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            confirm = QMessageBox.question(self, "Confirm Deletion", f"Are you sure you want to delete the case '{case_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if confirm == QMessageBox.StandardButton.Yes:
                 self.viewmodel.delete_case(case_id)
                 self.load_data()

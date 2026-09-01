@@ -20,18 +20,18 @@ class GlobalAnalysisView(QWidget):
 
         # Cabeçalho e Seletor
         top_bar = QHBoxLayout()
-        title = QLabel("Análise Global (Global Analysis)")
+        title = QLabel("Global Analysis")
         title.setStyleSheet("font-size: 28px; font-weight: bold; color: #2C3E50;")
         
         self.case_selector = QComboBox()
         self.case_selector.setFixedWidth(300)
         self.case_selector.setFixedHeight(35)
-        self.case_selector.addItem("Selecione um caso...")
+        self.case_selector.addItem("Select a case...")
         self.case_selector.setStyleSheet("padding: 5px; font-size: 14px;")
         
         top_bar.addWidget(title)
         top_bar.addStretch()
-        top_bar.addWidget(QLabel("Caso Base: "))
+        top_bar.addWidget(QLabel("Base Case: "))
         top_bar.addWidget(self.case_selector)
         
         layout.addLayout(top_bar)
@@ -52,9 +52,9 @@ class GlobalAnalysisView(QWidget):
         self.val_lold = self.create_indicator_card("LOLD (h/occ)", self.cards_grid, 1, 2)
 
         # Variáveis de Referência dos Metadados (Configurações do Caso)
-        self.val_analysis_type = self.create_indicator_card("Tipo de Análise", self.cards_grid, 2, 0)
-        self.val_beta = self.create_indicator_card("Convergência (Beta)", self.cards_grid, 2, 1)
-        self.val_years = self.create_indicator_card("Anos Simulados", self.cards_grid, 2, 2)
+        self.val_analysis_type = self.create_indicator_card("Type of Analysis", self.cards_grid, 2, 0)
+        self.val_beta = self.create_indicator_card("Convergence (Beta)", self.cards_grid, 2, 1)
+        self.val_years = self.create_indicator_card("Simulated Years", self.cards_grid, 2, 2)
 
         layout.addLayout(self.cards_grid)
         layout.addStretch() # Empurra tudo para cima
@@ -94,7 +94,7 @@ class GlobalAnalysisView(QWidget):
         # Evita disparar o evento de "changed" enquanto popula
         self.case_selector.blockSignals(True)
         self.case_selector.clear()
-        self.case_selector.addItem("Selecione um caso...")
+        self.case_selector.addItem("Select a case...")
         self.case_mapping.clear()
         
         for case in cases:

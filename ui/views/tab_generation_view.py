@@ -22,19 +22,19 @@ class TabGenerationView(QWidget):
         kpi_layout = QHBoxLayout()
         kpi_layout.setSpacing(15)
 
-        self.card_total = self._create_kpi_card("Total de Unidades", "0", "#2980B9")
-        self.card_capacity = self._create_kpi_card("Capacidade Instalada (MW)", "0.0", "#27AE60")
-        self.card_fail_rate = self._create_kpi_card("Taxa Média Falhas (%)", "0.0", "#E74C3C")
+        self.card_total = self._create_kpi_card("Total Units", "0", "#2980B9")
+        self.card_capacity = self._create_kpi_card("Installed Capacity (MW)", "0.0", "#27AE60")
+        self.card_fail_rate = self._create_kpi_card("Average Failure Rate (%)", "0.0", "#E74C3C")
 
         kpi_layout.addWidget(self.card_total)
         kpi_layout.addWidget(self.card_capacity)
         kpi_layout.addWidget(self.card_fail_rate)
         main_layout.addLayout(kpi_layout)
 
-        # 2. BARRA DE BUSCA
+        # 2. SEARCH BAR
         search_layout = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("🔍 Filtrar por nome do gerador, tecnologia ou barra...")
+        self.search_input.setPlaceholderText("🔍 Filter by generator name, technology or bus...")
         self.search_input.setFixedHeight(35)
         self.search_input.setStyleSheet("""
             QLineEdit {
@@ -47,7 +47,7 @@ class TabGenerationView(QWidget):
 
         # 3. TABELA DE GERADORES
         self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["ID Ext.", "Nome", "Tecnologia", "Barra de Conexão", "Cap. (MW)", "Taxa Falha (%)", "T. Reparo (h)"])
+        self.table.setHorizontalHeaderLabels(["ID Ext.", "Name", "Technology", "Bus", "Cap. (MW)", "Fail Rate (%)", "Repair Time (h)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)

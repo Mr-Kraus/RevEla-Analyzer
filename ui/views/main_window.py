@@ -4,13 +4,13 @@ from ui.views.cases_view import CasesView
 from ui.views.dashboard_view import DashboardView 
 from ui.views.tab_global_view import TabGlobalView
 from ui.views.settings_view import SettingsView
-from ui.views.comparison_view import ComparisonView # <-- ABA RESTABELECIDA
+from ui.views.comparison_view import ComparisonView 
 from ui.views.case_analysis_view import CaseAnalysisView
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("REVela Analyzer - Enterprise")
+        self.setWindowTitle("RevEla Analyzer - LABPLAN")
         self.resize(1280, 720)
         self.setup_ui()
         
@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        logo_label = QLabel("REVela\nAnalyzer")
+        logo_label = QLabel("RevEla\nAnalyzer")
         logo_label.setStyleSheet("color: white; font-size: 22px; font-weight: bold; padding: 20px;")
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(logo_label)
@@ -49,12 +49,12 @@ class MainWindow(QMainWindow):
         self.nav_group = QButtonGroup(self)
         self.nav_group.setExclusive(True)
 
-        self.btn_dashboard = self.create_nav_button("📊 Dashboard", 0)
-        self.btn_casos = self.create_nav_button("📁 Gestão de Casos", 1)
-        self.btn_global = self.create_nav_button("🌍 Análise Global", 2)
-        self.btn_compare = self.create_nav_button("⚖️ Comparações", 3) # <-- BOTÃO DE VOLTA
-        self.btn_detailed = self.create_nav_button("🔍 Análise de Caso", 4)
-        self.btn_settings = self.create_nav_button("⚙️ Configurações", 5)
+        self.btn_dashboard = self.create_nav_button("HOME", 0)
+        self.btn_casos = self.create_nav_button("LOAD CASES", 1)
+        self.btn_global = self.create_nav_button("GLOBAL ANALYSIS", 2)
+        self.btn_compare = self.create_nav_button("COMPARISONS", 3) 
+        self.btn_detailed = self.create_nav_button("CASE ANALYSIS", 4)
+        self.btn_settings = self.create_nav_button("⚙️ SETTINGS", 5)
 
         sidebar_layout.addWidget(self.btn_dashboard)
         sidebar_layout.addWidget(self.btn_casos)
@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
         self.view_global = TabGlobalView()
         self.content_area.addWidget(self.view_global) # 2
         
-        self.view_compare = ComparisonView() # <-- ABA RESTABELECIDA
+        self.view_compare = ComparisonView() 
         self.content_area.addWidget(self.view_compare) # 3
         
         self.view_detailed = CaseAnalysisView()
@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
         """Muda a tela do StackedWidget com base no botão clicado"""
         self.content_area.setCurrentIndex(button.page_index)
         
-        # Dispara o carregamento de dados da aba correspondente (se o método existir)
+        # Dispara o carregamento de dados da aba correspondente
         if button.page_index == 0 and hasattr(self.view_dashboard, 'load_data'):
             self.view_dashboard.load_data()
         elif button.page_index == 1 and hasattr(self.view_cases, 'load_data'):
@@ -127,4 +127,4 @@ class MainWindow(QMainWindow):
         """Redireciona para a tela de Análise Detalhada de Caso quando solicitado."""
         self.view_detailed.load_case(case_id, case_name)
         self.btn_detailed.setChecked(True)
-        self.content_area.setCurrentIndex(4) # O Índice da Análise Detalhada agora é 4!
+        self.content_area.setCurrentIndex(4) 

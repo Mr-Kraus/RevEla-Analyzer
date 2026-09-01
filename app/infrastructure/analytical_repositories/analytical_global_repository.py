@@ -43,15 +43,25 @@ class AnalyticalGlobalRepository:
         ).scalar_one_or_none()
 
         # Agregações de Infraestrutura seguras
-        bus_count = self.session.execute(select(func.count(BusModel.id)).where(BusModel.system_id == system.id)).scalar() or 0
-        gen_count = self.session.execute(select(func.count(GeneratorModel.id)).where(GeneratorModel.system_id == system.id)).scalar() or 0
+        bus_count = self.session.execute(
+            select(func.count(BusModel.id))
+            .where(BusModel.system_id == system.id)
+        ).scalar() or 0
+        
+        gen_count = self.session.execute(
+            select(func.count(GeneratorModel.id))
+            .join(GeneratorClassModel, GeneratorModel.generator_class_id == GeneratorClassModel.id)
+            .where(GeneratorModel.system_id == system.id)
+            .where(GeneratorClassModel.nominal_capacity_mw < 9999) # Filtro aplicado
+        ).scalar() or 0
+        
         gen_capacity = self.session.execute(
-                select(func.sum(GeneratorClassModel.nominal_capacity_mw))
-                .select_from(GeneratorModel)
-                .join(GeneratorClassModel, GeneratorModel.generator_class_id == GeneratorClassModel.id)
-                .where(GeneratorModel.system_id == system.id)
-            ).scalar() or 0.0
-
+            select(func.sum(GeneratorClassModel.nominal_capacity_mw))
+            .select_from(GeneratorModel)
+            .join(GeneratorClassModel, GeneratorModel.generator_class_id == GeneratorClassModel.id)
+            .where(GeneratorModel.system_id == system.id)
+            .where(GeneratorClassModel.nominal_capacity_mw < 9999) # Filtro aplicado
+        ).scalar() or 0.0
 
         # BUSCA DINÂMICA DO BETA NA TABELA EAV
         configs = self.session.execute(

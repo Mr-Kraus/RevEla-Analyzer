@@ -17,49 +17,49 @@ class SettingsView(QWidget):
         main_layout.setContentsMargins(30, 30, 30, 30)
         main_layout.setSpacing(20)
 
-        title = QLabel("⚙️ Configurações Gerais do Sistema")
+        title = QLabel("⚙️ System Settings")
         title.setStyleSheet("font-size: 24px; font-weight: bold; color: #2C3E50;")
         main_layout.addWidget(title)
 
         # 1. Grupo de Formatação de Números
-        group_format = QGroupBox("Formatação e Precisão")
+        group_format = QGroupBox("Formatting and Precision")
         group_format.setStyleSheet("QGroupBox { font-weight: bold; color: #2C3E50; border: 1px solid #D5D8DC; border-radius: 8px; margin-top: 10px; padding: 15px; } QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }")
         layout_format = QVBoxLayout(group_format)
 
-        self.spin_table_dec = self._create_spinbox(layout_format, "Casas Decimais em Tabelas:", 0, 8)
-        self.spin_chart_dec = self._create_spinbox(layout_format, "Casas Decimais em Gráficos:", 0, 8)
+        self.spin_table_dec = self._create_spinbox(layout_format, "Decimal Places in Tables:", 0, 8)
+        self.spin_chart_dec = self._create_spinbox(layout_format, "Decimal Places in Charts:", 0, 8)
         
         self.combo_lolp = QComboBox()
         self.combo_lolp.addItems(["decimal", "scientific"])
-        self._add_row(layout_format, "Formato do Indicador LOLP:", self.combo_lolp)
+        self._add_row(layout_format, "LOLP Indicator Format:", self.combo_lolp)
         main_layout.addWidget(group_format)
 
         # 2. Grupo de Preferências Visuais
-        group_visual = QGroupBox("Preferências de Telas")
+        group_visual = QGroupBox("Screen Preferences")
         group_visual.setStyleSheet(group_format.styleSheet())
         layout_visual = QVBoxLayout(group_visual)
 
         self.combo_chart = QComboBox()
         self.combo_chart.addItems(["Pareto", "Barras", "Linha"])
-        self._add_row(layout_visual, "Tipo de Gráfico Padrão:", self.combo_chart)
+        self._add_row(layout_visual, "Default Chart Type:", self.combo_chart)
 
         self.combo_global = QComboBox()
-        self.combo_global.addItems(["Tipo 1: Detalhado por Caso", "Tipo 2: Comparativo Lado a Lado"])
-        self._add_row(layout_visual, "Aba Global Padrão:", self.combo_global)
+        self.combo_global.addItems(["Type 1: Detailed by Case", "Type 2: Side-by-Side Comparison"])
+        self._add_row(layout_visual, "Global Tab Type:", self.combo_global)
         main_layout.addWidget(group_visual)
 
         # 3. Grupo Conectividade
-        group_net = QGroupBox("Servidor & API")
+        group_net = QGroupBox("Server & API")
         group_net.setStyleSheet(group_format.styleSheet())
         layout_net = QVBoxLayout(group_net)
         
         self.txt_api = QLineEdit()
         self.txt_api.setStyleSheet("padding: 5px; border: 1px solid #BDC3C7; border-radius: 4px;")
-        self._add_row(layout_net, "Endereço da API Backend:", self.txt_api)
+        self._add_row(layout_net, "Backend API Address:", self.txt_api)
         main_layout.addWidget(group_net)
 
         # Botão Salvar
-        self.btn_save = QPushButton("💾 Salvar Configurações")
+        self.btn_save = QPushButton("💾 Save Settings")
         self.btn_save.setFixedHeight(40)
         self.btn_save.setFixedWidth(200)
         self.btn_save.setStyleSheet("QPushButton { background-color: #27AE60; color: white; font-weight: bold; border-radius: 6px; } QPushButton:hover { background-color: #2ECC71; }")

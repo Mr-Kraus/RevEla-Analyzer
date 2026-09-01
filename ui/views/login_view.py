@@ -11,7 +11,7 @@ class LoginView(QWidget):
         self.setup_connections()
 
     def setup_ui(self):
-        self.setWindowTitle("REVela Analyzer - Login")
+        self.setWindowTitle("RevEla Analyzer - Login")
         self.setFixedSize(350, 450)
         
         layout = QVBoxLayout(self)
@@ -19,7 +19,7 @@ class LoginView(QWidget):
         layout.setSpacing(15)
 
         # Título
-        title = QLabel("REVela Analyzer")
+        title = QLabel("RevEla Analyzer")
         font = title.font()
         font.setPointSize(18)
         font.setBold(True)
@@ -28,11 +28,13 @@ class LoginView(QWidget):
 
         # Campos de entrada
         self.email_input = QLineEdit()
-        self.email_input.setPlaceholderText("E-mail (ex: admin@revela.com)")
+        self.email_input.setPlaceholderText("Email")
+        self.email_input.setText("admin@revela.com")
         self.email_input.setFixedHeight(35)
 
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Senha")
+        self.password_input.setPlaceholderText("Password")
+        self.password_input.setText("senha123")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_input.setFixedHeight(35)
 

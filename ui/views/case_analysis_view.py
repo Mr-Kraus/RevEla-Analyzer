@@ -59,10 +59,10 @@ class CaseAnalysisView(QWidget):
         self.tab_transmission = TabTransmissionView()
         
         # Adicionando tudo no QTabWidget
-        self.tabs.addTab(self.tab_summary, "📊 Resumo Executivo")
-        self.tabs.addTab(self.tab_generation, "🏭 Geração")
-        self.tabs.addTab(self.tab_transmission, "⚡ Transmissão")
-        self.tabs.addTab(self.tab_topology, "🕸️ Topologia (Grafo)")
+        self.tabs.addTab(self.tab_summary, "General Information")
+        self.tabs.addTab(self.tab_generation, "Generation")
+        self.tabs.addTab(self.tab_transmission, "Transmission")
+        self.tabs.addTab(self.tab_topology, "Topology (Graph)")
 
         layout.addWidget(self.tabs)
 
