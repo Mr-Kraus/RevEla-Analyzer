@@ -20,6 +20,7 @@ class SystemModel(Base):
     generators = relationship("GeneratorModel", back_populates="system", cascade="all, delete-orphan")
     transmission_lines = relationship("TransmissionLineModel", back_populates="system", cascade="all, delete-orphan")
     transformers = relationship("TransformerModel", back_populates="system", cascade="all, delete-orphan")
+    generator_classes = relationship("GeneratorClassModel", back_populates="system", cascade="all, delete-orphan")
     
     case = relationship("CaseModel")
     simulation_run = relationship("SimulationRunModel")

@@ -24,7 +24,8 @@ class SystemNormalizer(BaseNormalizer):
         canonical_topology = {
             "regions": [],
             "buses": [],
-            "generation_classes": [],
+            "generator_classes": [], # Catálogo de Máquinas
+            "generators": [],        # Instâncias Físicas
             "transmission_lines": [],
             "transformers": [],
             "nominal_load_mw": getattr(raw_data, 'carga_nominal', 0.0) 
@@ -32,25 +33,54 @@ class SystemNormalizer(BaseNormalizer):
 
         blocks = raw_data.blocks
         unique_regions = set()
-
-        # 1. CLASSES DE GERAÇÃO
+        
+        # 1. CATÁLOGO DE GERAÇÃO (CLGERA -> generator_classes)
+        catalogo_ids = set()
         if "CLGERA" in blocks:
             for record in blocks["CLGERA"].records:
                 try:
                     ext_id = self._get_val(record, "CLAS", "CLASS")
                     if not ext_id: continue
                     
-                    canonical_topology["generation_classes"].append({
+                    canonical_topology["generator_classes"].append({
                         "external_id": ext_id,
                         "name": self._get_val(record, "NAME", "NOME"),
                         "failure_rate_percent": self._safe_float(self._get_val(record, "FRATE")),
                         "repair_time_hours": self._safe_float(self._get_val(record, "MTTR")),
                         "nominal_capacity_mw": self._safe_float(self._get_val(record, "RATED POW.", "Pot.Efetiva"))
                     })
+                    catalogo_ids.add(ext_id)
                 except Exception as e:
                     logger.warning(f"Erro ao normalizar classe de geração: {e}")
 
-        # 2. BARRAS DO SISTEMA
+        # 2. INSTÂNCIAS DE GERAÇÃO (TERMI, HIDRO, SOLAR... -> generators)
+        tecnologias = {
+            "TERMI": "TERMI", 
+            "HIDRO": "HIDRO", 
+            "SOLAR": "SOLAR", 
+            "EOLIC": "EOLIC",
+            "MINIH": "MINIH",
+            "COGER": "COGER",
+            "CCOMB": "CCOMB"
+        }
+        
+        for tag_bloco, tec_label in tecnologias.items():
+            if tag_bloco in blocks:
+                for record in blocks[tag_bloco].records:
+                    try:
+                        class_id = self._get_val(record, "CLASS", "CLAS")
+                        if class_id in catalogo_ids:
+                            canonical_topology["generators"].append({
+                                "external_id": self._get_val(record, "ID"),
+                                "name": self._get_val(record, "NAME", "NOME"),
+                                "technology": tec_label,
+                                "class_external_id": class_id,
+                                "bus_ext_id": self._get_val(record, "BUS") # Captura a barra se existir
+                            })
+                    except Exception as e:
+                        logger.warning(f"Erro ao normalizar instância de geração ({tec_label}): {e}")
+
+        # 3. BARRAS DO SISTEMA
         if "BARRAS" in blocks:
             for record in blocks["BARRAS"].records:
                 try:
@@ -70,7 +100,7 @@ class SystemNormalizer(BaseNormalizer):
                 except Exception as e:
                     logger.warning(f"Erro ao normalizar barra: {e}")
 
-        # 3. LINHAS DE TRANSMISSÃO
+        # 4. LINHAS DE TRANSMISSÃO
         if "LINHAS" in blocks:
             for record in blocks["LINHAS"].records:
                 try:
@@ -91,7 +121,7 @@ class SystemNormalizer(BaseNormalizer):
                 except Exception as e:
                     logger.warning(f"Erro ao normalizar linha: {e}")
 
-        # 4. TRANSFORMADORES
+        # 5. TRANSFORMADORES
         if "TRAFOS" in blocks:
             for record in blocks["TRAFOS"].records:
                 try:

@@ -4,6 +4,25 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.infrastructure.database.models.base import Base
 
+class GeneratorClassModel(Base):
+    __tablename__ = "generator_class"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    system_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("system.id", ondelete="CASCADE"), index=True)
+    
+    external_id: Mapped[str] = mapped_column(String, nullable=False) # Refere-se à coluna CLAS
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    
+    # Características Técnicas Centralizadas
+    nominal_capacity_mw: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
+    failure_rate_percent: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
+    repair_time_hours: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
+
+    # Relacionamentos
+    system = relationship("SystemModel", back_populates="generator_classes")
+    instances = relationship("GeneratorModel", back_populates="generator_class", cascade="all, delete-orphan")
+
+
 class GeneratorModel(Base):
     __tablename__ = "generator"
 
@@ -11,15 +30,17 @@ class GeneratorModel(Base):
     system_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("system.id", ondelete="CASCADE"), index=True)
     bus_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("bus.id", ondelete="SET NULL"), nullable=True, index=True)
     
-    external_id: Mapped[str] = mapped_column(String, nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    technology: Mapped[str] = mapped_column(String, nullable=True)
     
-    nominal_capacity_mw: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
-    failure_rate_percent: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
-    repair_time_hours: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
-
+    generator_class_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("generator_class.id", ondelete="CASCADE"), index=True)
+    
+    external_id: Mapped[str] = mapped_column(String, nullable=False) 
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    technology: Mapped[str] = mapped_column(String, nullable=True) # TERMI, HIDRO, SOLAR, EOLIC
+    
+    # Relacionamentos
     system = relationship("SystemModel", back_populates="generators")
+    generator_class = relationship("GeneratorClassModel", back_populates="instances")
+
 
 
 class TransmissionLineModel(Base):

@@ -4,11 +4,10 @@ from typing import Dict, Any
 import logging
 
 from app.domain.entities.reliability_result import ReliabilityResult
-from app.infrastructure.database.models.equipment_model import TransmissionLineModel, TransformerModel
+from app.infrastructure.database.models.equipment_model import TransmissionLineModel, TransformerModel, GeneratorModel, GeneratorClassModel
 from app.infrastructure.database.models.system_model import SystemModel
 from app.infrastructure.database.models.region_model import RegionModel
 from app.infrastructure.database.models.bus_model import BusModel
-from app.infrastructure.database.models.equipment_model import GeneratorModel
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,6 @@ class ReliabilityResultDtoMapper:
             lolf=clean_nan(dto.get("lolf", 0.0)),
             lold=clean_nan(dto.get("lold", 0.0)),
             lolc=clean_nan(dto.get("lolc", 0.0)),
-            # --- O ELO PERDIDO: Repassando o JSON ---
             confidence_intervals=dto.get("confidence_intervals", {})
         )
     
@@ -83,20 +81,44 @@ class SystemTopologyMapper:
             bus_models[str(bus["external_id"]).strip()] = b_model
             system_model.buses.append(b_model)
             
-        for gen in topology_dto.get("generation_classes", []):
-            system_model.generators.append(
-                GeneratorModel(
-                    id=uuid.uuid4(),
-                    external_id=str(gen["external_id"]).strip(),
-                    name=gen["name"],
-                    nominal_capacity_mw=gen["nominal_capacity_mw"],
-                    failure_rate_percent=gen["failure_rate_percent"],
-                    repair_time_hours=gen["repair_time_hours"]
-                )
+        # 1. Mapeia Catálogo de Máquinas (GeneratorClassModel)
+        gen_class_models = {}
+        for gc in topology_dto.get("generator_classes", []):
+            gc_model = GeneratorClassModel(
+                id=uuid.uuid4(),
+                external_id=str(gc["external_id"]).strip(),
+                name=gc["name"],
+                nominal_capacity_mw=gc["nominal_capacity_mw"],
+                failure_rate_percent=gc["failure_rate_percent"],
+                repair_time_hours=gc["repair_time_hours"]
             )
+            gen_class_models[str(gc["external_id"]).strip()] = gc_model
+            system_model.generator_classes.append(gc_model)
 
-        # 5. Mapeia Linhas de Transmissão passando OS OBJETOS (from_bus)
-        # para o SQLAlchemy criar o grafo de dependências corretamente!
+        # 2. Mapeia as Instâncias de Unidades Físicas (GeneratorModel)
+        for gen in topology_dto.get("generators", []):
+            class_model = gen_class_models.get(str(gen["class_external_id"]).strip())
+            
+            if class_model:
+                # Conecta a máquina à sua barra no sistema, caso exista
+                bus_id = None
+                if gen.get("bus_ext_id"):
+                    b_model = bus_models.get(str(gen["bus_ext_id"]).strip())
+                    if b_model:
+                        bus_id = b_model.id
+
+                system_model.generators.append(
+                    GeneratorModel(
+                        id=uuid.uuid4(),
+                        external_id=str(gen["external_id"]).strip(),
+                        name=gen["name"],
+                        technology=gen["technology"],
+                        generator_class=class_model,
+                        bus_id=bus_id
+                    )
+                )
+
+        # 3. Mapeia Linhas de Transmissão passando OS OBJETOS (from_bus)
         for line in topology_dto.get("transmission_lines", []):
             from_ext = str(line["from_bus_ext_id"]).strip()
             to_ext = str(line["to_bus_ext_id"]).strip()
@@ -110,8 +132,8 @@ class SystemTopologyMapper:
                         id=uuid.uuid4(),
                         external_id=str(line["external_id"]).strip(),
                         name=line["name"],
-                        from_bus=from_bus, # <-- MÁGICA: Ao invés de ID, passa a classe!
-                        to_bus=to_bus,     # <-- O SQLAlchemy força salvar o Bus antes!
+                        from_bus=from_bus, 
+                        to_bus=to_bus,    
                         r_pu=line.get("r_pu", 0.0),
                         x_pu=line.get("x_pu", 0.0),
                         capacity_mva=line.get("capacity_mva", 0.0),
@@ -125,7 +147,7 @@ class SystemTopologyMapper:
                     f"(From Bus: {from_ext}, To Bus: {to_ext}): Barra(s) não encontrada(s) no sistema."
                 )
 
-        # 6. Mapeia Transformadores passando OS OBJETOS
+        # 4. Mapeia Transformadores passando OS OBJETOS
         for trafo in topology_dto.get("transformers", []):
             from_ext = str(trafo["from_bus_ext_id"]).strip()
             to_ext = str(trafo["to_bus_ext_id"]).strip()
@@ -139,7 +161,7 @@ class SystemTopologyMapper:
                         id=uuid.uuid4(),
                         external_id=str(trafo["external_id"]).strip(),
                         name=trafo["name"],
-                        from_bus=from_bus, # <-- MÁGICA
+                        from_bus=from_bus, 
                         to_bus=to_bus,
                         r_pu=trafo.get("r_pu", 0.0),
                         x_pu=trafo.get("x_pu", 0.0),
@@ -155,4 +177,3 @@ class SystemTopologyMapper:
                 )
                     
         return system_model
-    

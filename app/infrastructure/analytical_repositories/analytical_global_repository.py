@@ -7,8 +7,11 @@ from app.infrastructure.database.models.system_model import SystemModel
 from app.infrastructure.database.models.simulation_model import SimulationRunModel
 from app.infrastructure.database.models.reliability_result_model import ReliabilityResultModel
 from app.infrastructure.database.models.bus_model import BusModel
-from app.infrastructure.database.models.equipment_model import GeneratorModel
+from app.infrastructure.database.models.equipment_model import GeneratorModel, GeneratorClassModel
 from app.infrastructure.database.models.config_model import SimulationConfigModel
+
+
+
 
 class AnalyticalGlobalRepository:
     def __init__(self, session: Session):
@@ -24,6 +27,7 @@ class AnalyticalGlobalRepository:
             select(SystemModel, SimulationRunModel)
             .join(SimulationRunModel, SystemModel.simulation_run_id == SimulationRunModel.id)
             .where(SystemModel.case_id == case_id)
+            .order_by(SimulationRunModel.imported_at.desc())  # <-- A MÁGICA ACONTECE AQUI
         ).first()
 
         if not sys_info:
@@ -41,7 +45,12 @@ class AnalyticalGlobalRepository:
         # Agregações de Infraestrutura seguras
         bus_count = self.session.execute(select(func.count(BusModel.id)).where(BusModel.system_id == system.id)).scalar() or 0
         gen_count = self.session.execute(select(func.count(GeneratorModel.id)).where(GeneratorModel.system_id == system.id)).scalar() or 0
-        gen_capacity = self.session.execute(select(func.sum(GeneratorModel.nominal_capacity_mw)).where(GeneratorModel.system_id == system.id)).scalar() or 0.0
+        gen_capacity = self.session.execute(
+                select(func.sum(GeneratorClassModel.nominal_capacity_mw))
+                .select_from(GeneratorModel)
+                .join(GeneratorClassModel, GeneratorModel.generator_class_id == GeneratorClassModel.id)
+                .where(GeneratorModel.system_id == system.id)
+            ).scalar() or 0.0
 
 
         # BUSCA DINÂMICA DO BETA NA TABELA EAV
