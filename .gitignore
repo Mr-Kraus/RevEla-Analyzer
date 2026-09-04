@@ -11,3 +11,13 @@ __pycache__/
 
 # O Golden Case C01 tem 40MB e dados do cliente, não sobe pro Git
 tests/fixtures/C01*
+Output/
+RevEla.spec
+build/
+dist/
+icone.ico
+instalador_revela.iss
+launcher.py
+license.txt
+gsql/
+seed.py

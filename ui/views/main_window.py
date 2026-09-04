@@ -6,6 +6,7 @@ from ui.views.tab_global_view import TabGlobalView
 from ui.views.settings_view import SettingsView
 from ui.views.comparison_view import ComparisonView 
 from ui.views.case_analysis_view import CaseAnalysisView
+from PyQt6.QtGui import QIcon
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -13,7 +14,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("RevEla Analyzer - LABPLAN")
         self.resize(1280, 720)
         self.setup_ui()
-        
+        self.setWindowIcon(QIcon("icone.ico"))
         # Após montar a UI, forçamos o clique no botão de Dashboard para iniciar na primeira tela
         self.btn_dashboard.click()
 

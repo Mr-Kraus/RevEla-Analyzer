@@ -1,50 +1,109 @@
+import os
+import sys
 from logging.config import fileConfig
+
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
 
-# Importar nossas configurações e a Base do SQLAlchemy
-from config.settings import settings
+# Importar a Base do SQLAlchemy e os modelos
 from app.infrastructure.database.models.base import Base
-from app.infrastructure.database.models.time_series_metadata_model import TimeSeriesMetadataModel
-from app.infrastructure.database.models.data_time_series_model import DataTimeSeriesModel
+from app.infrastructure.database.models.time_series_metadata_model import (
+    TimeSeriesMetadataModel,
+)
+from app.infrastructure.database.models.data_time_series_model import (
+    DataTimeSeriesModel,
+)
 
 
 config = context.config
 
-if config.config_file_name is not None:
+
+# =================================================================
+# CONFIGURAÇÃO DE LOGGING
+# =================================================================
+# Em desenvolvimento, o Alembic pode configurar seu próprio logging
+# através do alembic.ini.
+#
+# Quando executado dentro do .exe criado pelo PyInstaller, porém,
+# não permitimos que o fileConfig() sobrescreva o logging do launcher.
+# Isso é especialmente importante quando o executável usa --windowed,
+# pois nesse modo não existe console associado ao processo.
+if config.config_file_name is not None and not getattr(sys, "frozen", False):
     fileConfig(config.config_file_name)
 
-# Injetar a URL do banco dinamicamente
-config.set_main_option("sqlalchemy.url", settings.database_url)
 
-# Apontar o target_metadata para a nossa Base
+# =================================================================
+# RESOLUÇÃO DINÂMICA DE URL
+# =================================================================
+# 1. Verifica se a URL já foi injetada em memória pelo launcher.py.
+db_url = config.get_main_option("sqlalchemy.url")
+
+
+# 2. Se não encontrar a URL em memória, carrega via Pydantic.
+#    Isso mantém o funcionamento normal no ambiente de desenvolvimento.
+if not db_url:
+    from config.settings import settings
+
+    db_url = settings.database_url
+    config.set_main_option("sqlalchemy.url", db_url)
+
+
+# =================================================================
+# SQLALCHEMY METADATA
+# =================================================================
+# Aponta o target_metadata para a Base utilizada pelos modelos.
 target_metadata = Base.metadata
 
+
+# =================================================================
+# MIGRAÇÕES OFFLINE
+# =================================================================
 def run_migrations_offline() -> None:
+    """
+    Executa as migrações em modo offline.
+    """
+
     url = config.get_main_option("sqlalchemy.url")
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
+
+# =================================================================
+# MIGRAÇÕES ONLINE
+# =================================================================
 def run_migrations_online() -> None:
+    """
+    Executa as migrações conectando diretamente ao banco de dados.
+    """
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
         )
+
         with context.begin_transaction():
             context.run_migrations()
 
+
+# =================================================================
+# EXECUÇÃO
+# =================================================================
 if context.is_offline_mode():
     run_migrations_offline()
 else:
