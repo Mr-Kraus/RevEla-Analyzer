@@ -15,9 +15,7 @@ Output/
 RevEla.spec
 build/
 dist/
-icone.ico
 instalador_revela.iss
 launcher.py
-license.txt
 gsql/
-seed.py
+pgsql/
