@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List
-
+import uuid
 from app.domain.entities.time_series import TimeSeriesMetadata, DataTimeSeries
 from app.infrastructure.database.models.time_series_metadata_model import TimeSeriesMetadataModel
 from app.infrastructure.database.models.data_time_series_model import DataTimeSeriesModel
@@ -25,3 +25,28 @@ class PostgresTimeSeriesRepository:
         except Exception as e:
             self.session.rollback()
             raise e
+
+    def get_ens_series_by_simulation(self, simulation_id: uuid.UUID) -> dict:
+        """Busca as séries temporais de ENS (G, T e G+T) de uma simulação."""
+        from sqlalchemy import select
+        from app.infrastructure.database.models.time_series_metadata_model import TimeSeriesMetadataModel
+        from app.infrastructure.database.models.data_time_series_model import DataTimeSeriesModel
+        
+        # Faz o JOIN entre Metadados e os Arrays de Dados
+        stmt = (
+            select(TimeSeriesMetadataModel, DataTimeSeriesModel)
+            .join(DataTimeSeriesModel, TimeSeriesMetadataModel.id == DataTimeSeriesModel.metadata_id)
+            .where(TimeSeriesMetadataModel.simulation_run_id == simulation_id)
+            .where(TimeSeriesMetadataModel.series_type == "ENS")
+        )
+        
+        results = self.session.execute(stmt).all()
+        
+        ens_dict = {}
+        for metadata, data in results:
+            ens_dict[metadata.name] = {
+                "unit_y": metadata.unit_y,
+                "values": data.values
+            }
+            
+        return ens_dict

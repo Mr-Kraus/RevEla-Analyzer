@@ -2,6 +2,7 @@
 venv/
 env/
 .env
+revela
 
 # Cache do Python e Pytest
 __pycache__/
@@ -9,8 +10,10 @@ __pycache__/
 *$py.class
 .pytest_cache/
 
-# O Golden Case C01 tem 40MB e dados do cliente, não sobe pro Git
+# O Golden Case não sobe pro Git
 tests/fixtures/C01*
+
+# outros
 Output/
 RevEla.spec
 build/

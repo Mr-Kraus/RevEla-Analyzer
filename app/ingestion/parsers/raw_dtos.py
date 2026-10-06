@@ -28,3 +28,13 @@ class RawReliabilityIndicesDTO(BaseModel):
     simulated_years: int = 0
     confidence_intervals: Dict[str, Any] = field(default_factory=dict)
     regional_indices: dict = None
+
+@dataclass
+class RawTimeSeriesBlockDTO:
+    name: str
+    series_type: str
+    raw_values: List[float]
+
+@dataclass
+class RawTimeSeriesDTO:
+    series: List[RawTimeSeriesBlockDTO] = field(default_factory=list)

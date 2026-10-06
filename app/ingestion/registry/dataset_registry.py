@@ -77,7 +77,7 @@ class DatasetRegistry:
             dataset_family="Generation",
             dataset_type="RESULT",
             required=False,
-            priority=40,
+            priority=50,
             parser_identifier="GenerationResultParser"
         ))
         
@@ -88,6 +88,16 @@ class DatasetRegistry:
             dataset_family="Transmission",
             dataset_type="RESULT",
             required=False,
-            priority=50,
+            priority=60,
             parser_identifier="TransmissionResultParser"
+        ))
+
+        self.register(DatasetDefinition(
+            dataset_code="ENS_HOURLY_RESULTS",
+            filename_pattern="ENS - hourly average.csv",
+            dataset_family="Reliability_TimeSeries",
+            dataset_type="RESULT",
+            required=False,
+            priority=40,
+            parser_identifier="ResultsTimeSeriesParser"
         ))

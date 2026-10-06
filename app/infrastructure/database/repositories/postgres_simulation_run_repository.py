@@ -8,7 +8,6 @@ from app.domain.interfaces.simulation_repository import SimulationRunRepository
 from app.domain.exceptions.base_exceptions import RepositoryError
 from app.infrastructure.database.models.simulation_model import SimulationRunModel
 
-# A IMPORTAÇÃO QUE FALTAVA (CORREÇÃO C1)
 from app.infrastructure.database.mappers.simulation_run_mapper import SimulationRunMapper
 
 

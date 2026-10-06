@@ -21,6 +21,8 @@ from app.infrastructure.database.models.simulation_model import SimulationRunMod
 from app.infrastructure.database.repositories.postgres_time_series_repository import PostgresTimeSeriesRepository
 from app.ingestion.parsers.time_series_parser import TimeSeriesParser
 from app.application.use_cases.persist_time_series_use_case import PersistTimeSeriesUseCase
+from app.ingestion.parsers.results_time_series_parser import ResultsTimeSeriesParser
+from app.ingestion.normalizers.time_series_normalizer import TimeSeriesNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -94,39 +96,54 @@ class CaseIngestionPipeline:
             # =====================================================================
             # PASSO 4: EXTRAÇÃO E PERSISTÊNCIA DAS SÉRIES TEMPORAIS
             # =====================================================================
-            all_parsed_series = []
+            all_canonical_series = []
             
-            # Mapeamento do nome do arquivo físico para o Tipo de Série
-            ts_files_map = {
-                "Template Load.csv": "Load",
-                "Template Solar.csv": "Solar",
-                "Template Hydro.csv": "Hydro",
-                "Template Wind.csv": "Wind",
-                "Template Small-Hydro.csv": "Small-Hydro"
+            # 4.1 Lendo arquivos de Entrada (Templates com Tags <VAL>)
+            template_ts_map = {
+                "Template Load.txt": ("Load", "Input", "MW"),
+                "Template Solar.txt": ("Solar", "Input", "MW"),
+                "Template Hydro.txt": ("Hydro", "Input", "MW")
             }
 
-            # Varre o diretório dinamicamente procurando os templates
-            for filename, series_type in ts_files_map.items():
+            for filename, (series_type, position, unit_y) in template_ts_map.items():
                 found_files = list(case_folder.rglob(filename))
-                
                 if found_files:
-                    filepath = str(found_files[0])
-                    logger.info(f"Lendo arquivo de série temporal: {filename}")
                     try:
-                        # Extrai os blocos <VALOR> ou <VAL> do arquivo
-                        parsed_data = TimeSeriesParser.parse_file(filepath, series_type)
-                        all_parsed_series.extend(parsed_data)
+                        raw_ts_dto = TimeSeriesParser.parse_file(str(found_files[0]), series_type)
+                        canon_ts_list = TimeSeriesNormalizer().normalize(raw_ts_dto, position=position, unit_y=unit_y)
+                        all_canonical_series.extend(canon_ts_list)
                     except Exception as e:
-                        logger.warning(f"Aviso: Falha ao ler '{filename}': {e}. A série foi ignorada.")
+                        logger.warning(f"Falha ao ler template '{filename}': {e}")
 
-            # Se encontrou alguma matriz de dados, envia para o Use Case salvar atomicamente
-            if all_parsed_series:
-                logger.info(f"Persistindo {len(all_parsed_series)} matrizes de séries temporais...")
-                self.persist_ts_use_case.execute(simulation_run_id, all_parsed_series)
+            # 4.2 Lendo arquivos de Saída/Resultados (CSVs Limpos com G, T, G+T)
+            results_ts_map = {
+                "ENS - hourly average.csv": ("ENS", "Output", "MW")
+                
+            }
+
+            for filename, (series_type, position, unit_y) in results_ts_map.items():
+                found_files = list(case_folder.rglob(filename))
+                if found_files:
+                    try:
+                        
+                        raw_ts_dto = ResultsTimeSeriesParser.parse_file(str(found_files[0]), series_type)
+                        
+                        
+                        canon_ts_list = TimeSeriesNormalizer().normalize(raw_ts_dto, position=position, unit_y=unit_y)
+                        all_canonical_series.extend(canon_ts_list)
+                    except Exception as e:
+                        logger.warning(f"Falha ao ler resultado '{filename}': {e}")
+
+            # 4.3 Persistência
+            if all_canonical_series:
+                logger.info(f"Persistindo {len(all_canonical_series)} séries temporais...")
+                self.persist_ts_use_case.execute(simulation_run_id, all_canonical_series)
 
             return True
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.session.rollback()
             logger.error(f"Erro crítico no pipeline de ingestão: {e}")
             print(f"Erro crítico no pipeline de ingestão: {e}")

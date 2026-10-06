@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api.routes import auth_routes, case_routes, import_routes # <-- adicione o case_routes aqui
+from app.api.routes import auth_routes, case_routes, import_routes, analysis_time_series_routes # <-- adicione o routes aqui
 from app.api.routes import analysis_global_routes, analysis_case_routes, analysis_compare_routes
 app = FastAPI(
     title="RevEla Analyzer API",
@@ -14,7 +14,7 @@ app.include_router(import_routes.router)
 app.include_router(analysis_global_routes.router)
 app.include_router(analysis_case_routes.router)
 app.include_router(analysis_compare_routes.router)
-
+app.include_router(analysis_time_series_routes.router)
 
 
 @app.get("/")
