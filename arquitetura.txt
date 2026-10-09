@@ -5,9 +5,12 @@
     [ARQUIVO] arquitetura.txt
     [ARQUIVO] create_admin.py
     [ARQUIVO] criar_admin.py
+    [ARQUIVO] icone.ico
+    [ARQUIVO] license.txt
     [ARQUIVO] main_gui.py
     [ARQUIVO] pyproject.toml
     [ARQUIVO] requirements.txt
+    [ARQUIVO] seed.py
     [ARQUIVO] temp_topology.html
     [PASTA] app
         [ARQUIVO] main.py
@@ -24,6 +27,7 @@
                 [ARQUIVO] analysis_case_routes.py
                 [ARQUIVO] analysis_compare_routes.py
                 [ARQUIVO] analysis_global_routes.py
+                [ARQUIVO] analysis_time_series_routes.py
                 [ARQUIVO] auth_routes.py
                 [ARQUIVO] case_routes.py
                 [ARQUIVO] import_routes.py
@@ -33,6 +37,7 @@
                 [ARQUIVO] base_schema.py
                 [ARQUIVO] case_schema.py
                 [ARQUIVO] import_schema.py
+                [ARQUIVO] time_series_schema.py
             [PASTA] security
                 [ARQUIVO] jwt.py
                 [ARQUIVO] password.py
@@ -66,6 +71,7 @@
                 [PASTA] analytical
                     [ARQUIVO] compare_cases_use_case.py
                     [ARQUIVO] get_case_analysis_use_case.py
+                    [ARQUIVO] get_ens_aggregation_use_case.py
                     [ARQUIVO] get_global_indicators_use_case.py
                     [ARQUIVO] multi_compare_cases_use_case.py
                     [ARQUIVO] multi_compare_time_series_use_case.py
@@ -90,6 +96,7 @@
             [PASTA] enums
                 [ARQUIVO] __init__.py
                 [ARQUIVO] case_status.py
+                [ARQUIVO] granularity_enum.py
             [PASTA] exceptions
                 [ARQUIVO] __init__.py
                 [ARQUIVO] base_exceptions.py
@@ -170,11 +177,13 @@
                 [ARQUIVO] reliability_indices_normalizer.py
                 [ARQUIVO] settings_normalizer.py
                 [ARQUIVO] system_normalizer.py
+                [ARQUIVO] time_series_normalizer.py
             [PASTA] parsers
                 [ARQUIVO] __init__.py
                 [ARQUIVO] base_parser.py
                 [ARQUIVO] raw_dtos.py
                 [ARQUIVO] reliability_indices_parser.py
+                [ARQUIVO] results_time_series_parser.py
                 [ARQUIVO] system_parser_factory.py
                 [ARQUIVO] template_settings_parser.py
                 [ARQUIVO] template_system_parser.py
@@ -232,6 +241,7 @@
             [ARQUIVO] 14ae463042a9_add_rbac_tables.py
             [ARQUIVO] 1839b446dcc8_add_time_series_tables.py
             [ARQUIVO] 1d117bc5be9d_add_electrical_params_to_equipment.py
+            [ARQUIVO] 267cb602e877_split_generator_catalog_and_instance.py
             [ARQUIVO] 3a4555b3328c_add_importjob_model.py
             [ARQUIVO] 52a62d030302_add_confidence_json.py
             [ARQUIVO] 5dfe869ee5c9_add_importjob_model.py
@@ -244,141 +254,10 @@
             [ARQUIVO] da6e43e90f83_add_time_series_tables.py
             [ARQUIVO] e580308cde1e_add_region_and_bus_tables.py
             [ARQUIVO] e5b7c44bfee8_add_confidence_json.py
-    [PASTA] scripts
     [PASTA] tests
         [ARQUIVO] conftest.py
-        [PASTA] acceptance
         [PASTA] fixtures
             [ARQUIVO] README.md
-            [PASTA] C01
-                [ARQUIVO] Template Hydro.csv
-                [ARQUIVO] Template Load.csv
-                [ARQUIVO] Template Maintenance.csv
-                [ARQUIVO] Template Other Special Regime (Generation).csv
-                [ARQUIVO] Template Production Cost.csv
-                [ARQUIVO] Template Reserve Requirement.csv
-                [ARQUIVO] Template Settings.csv
-                [ARQUIVO] Template Small-Hydro.csv
-                [ARQUIVO] Template Solar.csv
-                [ARQUIVO] Template System.csv
-                [ARQUIVO] Template System_LambdaTx2_TAPon.csv
-                [ARQUIVO] Template Wind Uncertainty.csv
-                [ARQUIVO] Template Wind.csv
-                [PASTA] Results_STA_STR_1%
-                    [ARQUIVO] Allocated hydro - annual average.csv
-                    [ARQUIVO] Allocated hydro - hourly average.csv
-                    [ARQUIVO] Allocated hydro - monthly average.csv
-                    [ARQUIVO] Allocated hydro - weekly average.csv
-                    [ARQUIVO] Available Power - annual average.csv
-                    [ARQUIVO] Available Power - hourly average.csv
-                    [ARQUIVO] Available Power - monthly average.csv
-                    [ARQUIVO] Available Power - weekly average.csv
-                    [ARQUIVO] Available Power factor - annual average.csv
-                    [ARQUIVO] Available Power factor - hourly average.csv
-                    [ARQUIVO] Available Power factor - monhtly average.csv
-                    [ARQUIVO] Available Power factor - weekly average.csv
-                    [ARQUIVO] Available Reserve - annual average.csv
-                    [ARQUIVO] Available Reserve - hourly average.csv
-                    [ARQUIVO] Available Reserve - monthly average.csv
-                    [ARQUIVO] Available Reserve - weekly average.csv
-                    [ARQUIVO] Benefit of turbine power plant - annual average.csv
-                    [ARQUIVO] Benefit of turbine power plant - hourly average.csv
-                    [ARQUIVO] Benefit of turbine power plant - monthly average.csv
-                    [ARQUIVO] Benefit of turbine power plant - weekly average.csv
-                    [ARQUIVO] Day-ahead Marginal Cost - annual average.csv
-                    [ARQUIVO] Day-ahead Marginal Cost - hourly average.csv
-                    [ARQUIVO] Day-ahead Marginal Cost - monthly average.csv
-                    [ARQUIVO] Day-ahead Marginal Cost - weekly average.csv
-                    [ARQUIVO] ENS - annual average.csv
-                    [ARQUIVO] ENS - hourly average.csv
-                    [ARQUIVO] ENS - monthly average.csv
-                    [ARQUIVO] ENS - weekly average.csv
-                    [ARQUIVO] Final Reliability Indices.csv
-                    [ARQUIVO] Fuel Charges - annual average.csv
-                    [ARQUIVO] Fuel Charges - hourly average.csv
-                    [ARQUIVO] Fuel Charges - monthly average.csv
-                    [ARQUIVO] Fuel Charges - weekly average.csv
-                    [ARQUIVO] Generation - annual average.csv
-                    [ARQUIVO] Generation - hourly average.csv
-                    [ARQUIVO] Generation - monthly average.csv
-                    [ARQUIVO] Generation - weekly average.csv
-                    [ARQUIVO] Generation Distribution - annual average.csv
-                    [ARQUIVO] Generation Distribution - hourly average.csv
-                    [ARQUIVO] Generation Distribution - monthly average.csv
-                    [ARQUIVO] Generation Distribution - weekly average.csv
-                    [ARQUIVO] Hydro model variables - hourly average.csv
-                    [ARQUIVO] Marginal Cost - annual average.csv
-                    [ARQUIVO] Marginal Cost - hourly average.csv
-                    [ARQUIVO] Marginal Cost - monthly average.csv
-                    [ARQUIVO] Marginal Cost - weekly average.csv
-                    [ARQUIVO] Monitoring index - Avaliable capacity - annual.csv
-                    [ARQUIVO] Monitoring index - Avaliable capacity - hourly.csv
-                    [ARQUIVO] Monitoring index - Avaliable capacity - monthly.csv
-                    [ARQUIVO] Monitoring index - Avaliable capacity - weekly.csv
-                    [ARQUIVO] Monitoring index - Capacity - annual.csv
-                    [ARQUIVO] Monitoring index - Energy - annual.csv
-                    [ARQUIVO] Ordered Values.csv
-                    [ARQUIVO] Power circulation into MAT - hourly.csv
-                    [ARQUIVO] Power injection into MAT - hourly.csv
-                    [ARQUIVO] Production Marginal Value - annual average.csv
-                    [ARQUIVO] Production Marginal Value - hourly average.csv
-                    [ARQUIVO] Production Marginal Value - monthly average.csv
-                    [ARQUIVO] Production Marginal Value - weekly average.csv
-                    [ARQUIVO] Production Value - annual average.csv
-                    [ARQUIVO] Production Value - hourly average.csv
-                    [ARQUIVO] Production Value - monthly average.csv
-                    [ARQUIVO] Production Value - weekly average.csv
-                    [ARQUIVO] Pumping - Arbitrage - annual average.csv
-                    [ARQUIVO] Pumping - Arbitrage - hourly average.csv
-                    [ARQUIVO] Pumping - Arbitrage - monthly average.csv
-                    [ARQUIVO] Pumping - Arbitrage - weekly average.csv
-                    [ARQUIVO] Pumping - Remedial action - annual average.csv
-                    [ARQUIVO] Pumping - Remedial action - hourly average.csv
-                    [ARQUIVO] Pumping - Remedial action - monthly average.csv
-                    [ARQUIVO] Pumping - Remedial action - weekly average.csv
-                    [ARQUIVO] Pumping - Seasonal - annual average.csv
-                    [ARQUIVO] Pumping - Seasonal - hourly average.csv
-                    [ARQUIVO] Pumping - Seasonal - monthly average.csv
-                    [ARQUIVO] Pumping - Seasonal - weekly average.csv
-                    [ARQUIVO] Pumping costs - annual average.csv
-                    [ARQUIVO] Pumping costs - hourly average.csv
-                    [ARQUIVO] Pumping costs - monthly average.csv
-                    [ARQUIVO] Pumping costs - weekly average.csv
-                    [ARQUIVO] Simulation Config.csv
-                    [ARQUIVO] System coverage index - annual average.csv
-                    [ARQUIVO] System coverage index - hourly average.csv
-                    [ARQUIVO] System coverage index - monthly average.csv
-                    [ARQUIVO] System coverage index - weekly average.csv
-                    [ARQUIVO] System coverage index with interconnection balance - annual average.csv
-                    [ARQUIVO] System coverage index with interconnection balance - hourly average.csv
-                    [ARQUIVO] System coverage index with interconnection balance - monthly average.csv
-                    [ARQUIVO] System coverage index with interconnection balance - weekly average.csv
-                    [ARQUIVO] System inertia level estimation - hourly average.csv
-                    [ARQUIVO] System load - annual average.csv
-                    [ARQUIVO] System load - hourly average.csv
-                    [ARQUIVO] System load - monthly average.csv
-                    [ARQUIVO] System load - weekly average.csv
-                    [ARQUIVO] System load EV - hourly average.csv
-                    [ARQUIVO] Transmission - annual average.csv
-                    [ARQUIVO] Transmission - hourly average.csv
-                    [ARQUIVO] Transmission - monthly average.csv
-                    [ARQUIVO] Transmission - weekly average.csv
-                    [ARQUIVO] Transmission capacity - annual average.csv
-                    [ARQUIVO] Transmission capacity - hourly average.csv
-                    [ARQUIVO] Transmission capacity - monthly average.csv
-                    [ARQUIVO] Transmission capacity - weekly average.csv
-                    [ARQUIVO] Transmission capacity factor - annual average.csv
-                    [ARQUIVO] Transmission capacity factor - hourly average.csv
-                    [ARQUIVO] Transmission capacity factor - monthly average.csv
-                    [ARQUIVO] Transmission capacity factor - weekly average.csv
-                    [ARQUIVO] Transmission utilization factor - annual average.csv
-                    [ARQUIVO] Transmission utilization factor - hourly average.csv
-                    [ARQUIVO] Transmission utilization factor - monthly average.csv
-                    [ARQUIVO] Transmission utilization factor - weekly average.csv
-                    [ARQUIVO] Utilization factor - annual average.csv
-                    [ARQUIVO] Utilization factor - hourly average.csv
-                    [ARQUIVO] Utilization factor - monthly average.csv
-                    [ARQUIVO] Utilization factor - weekly average.csv
             [PASTA] C02
                 [PASTA] C02.SãoTome2025_real_TAPon_2%_12pr
                     [ARQUIVO] Template Hydro.csv
@@ -543,6 +422,8 @@
                     [ARQUIVO] test_template_settings_parser.py
                     [ARQUIVO] test_template_system_parser.py
     [PASTA] ui
+        [ARQUIVO] resources.qrc
+        [ARQUIVO] resources_rc.py
         [PASTA] dialogs
             [ARQUIVO] __init__.py
         [PASTA] navigation
@@ -555,6 +436,7 @@
             [ARQUIVO] settings_service.py
         [PASTA] themes
             [ARQUIVO] __init__.py
+            [ARQUIVO] styles.py
         [PASTA] viewmodels
             [ARQUIVO] __init__.py
             [ARQUIVO] case_analysis_viewmodel.py
@@ -586,3 +468,12 @@
             [ARQUIVO] tab_transmission_view.py
         [PASTA] widgets
             [ARQUIVO] __init__.py
+            [ARQUIVO] arrow_down.png
+            [ARQUIVO] comando_de_atualizacao_rc.txt
+            [ARQUIVO] point.png
+            [ARQUIVO] point_off.png
+            [ARQUIVO] point_solid.png
+            [ARQUIVO] reload.png
+            [ARQUIVO] settings.png
+            [ARQUIVO] triangle_down.png
+            [ARQUIVO] triangle_up.png

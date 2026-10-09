@@ -1,12 +1,12 @@
 from PyQt6.QtCore import QObject, pyqtSignal
-from ui.services.api_client import APIClient
 import requests
+from ui.services.api_client import APIClient
 from app.infrastructure.database.session.database import SessionLocal
-from app.application.use_cases.analytical.multi_compare_cases_use_case import MultiCompareCasesUseCase
 from app.application.use_cases.analytical.multi_compare_time_series_use_case import MultiCompareTimeSeriesUseCase
 
 class ComparisonViewModel(QObject):
-    cases_loaded = pyqtSignal(list)
+    # Sinais atualizados para fazer "match" exato com a View
+    cases_list_ready = pyqtSignal(list)
     comparison_data_ready = pyqtSignal(dict) 
     error_occurred = pyqtSignal(str)
     is_loading = pyqtSignal(bool)
@@ -16,13 +16,9 @@ class ComparisonViewModel(QObject):
         super().__init__()
         self.api_url = "http://127.0.0.1:8000"
         self.api_client = APIClient()
-        self.case_a_id = None
-        self.case_b_id = None
-        self.data_a = None
-        self.data_b = None
 
-    def load_cases(self):
-        """Busca os casos disponíveis para preencher os seletores."""
+    def load_available_cases(self):
+        """Busca os casos disponíveis para preencher os seletores da interface."""
         self.is_loading.emit(True)
         self._worker = self.api_client.make_request_async("GET", "/cases")
         self._worker.finished.connect(self._on_cases_loaded)
@@ -32,61 +28,14 @@ class ComparisonViewModel(QObject):
     def _on_cases_loaded(self, response):
         self.is_loading.emit(False)
         if response.status_code == 200:
+            # Filtra apenas os casos prontos (READY)
             cases = [c for c in response.json().get("data", []) if c.get("status") == "READY"]
-            self.cases_loaded.emit(cases)
+            self.cases_list_ready.emit(cases)
         else:
             self.error_occurred.emit("Falha ao carregar lista de casos.")
 
-    # ==========================================
-    # CORRENTE DE REQUISIÇÕES (A -> B -> Tela)
-    # ==========================================
-    def compare_cases(self, case_a_id: str, case_b_id: str):
-        self.is_loading.emit(True)
-        self.case_b_id = case_b_id
-        # Inicia a busca pelo Caso A
-        self._worker_sim_a = self.api_client.make_request_async("GET", f"/cases/{case_a_id}/simulations")
-        self._worker_sim_a.finished.connect(self._on_sim_a_loaded)
-        self._worker_sim_a.error.connect(self._on_error)
-        self._worker_sim_a.start()
-
-    def _on_sim_a_loaded(self, response):
-        sims = response.json().get("data", []) if response.status_code == 200 else []
-        if not sims: return self._on_error("Simulação não encontrada para o Caso A.")
-        
-        sim_id = sims[0].get("simulation_id")
-        self._worker_glob_a = self.api_client.make_request_async("GET", f"/analysis/global/{sim_id}")
-        self._worker_glob_a.finished.connect(self._on_glob_a_loaded)
-        self._worker_glob_a.start()
-
-    def _on_glob_a_loaded(self, response):
-        self.data_a = response.json().get("data", {}).get("indicators", {}) if response.status_code == 200 else {}
-        
-        # Agora busca a Simulação do Caso B
-        self._worker_sim_b = self.api_client.make_request_async("GET", f"/cases/{self.case_b_id}/simulations")
-        self._worker_sim_b.finished.connect(self._on_sim_b_loaded)
-        self._worker_sim_b.start()
-
-    def _on_sim_b_loaded(self, response):
-        sims = response.json().get("data", []) if response.status_code == 200 else []
-        if not sims: return self._on_error("Simulação não encontrada para o Caso B.")
-        
-        sim_id = sims[0].get("simulation_id")
-        self._worker_glob_b = self.api_client.make_request_async("GET", f"/analysis/global/{sim_id}")
-        self._worker_glob_b.finished.connect(self._on_glob_b_loaded)
-        self._worker_glob_b.start()
-
-    def _on_glob_b_loaded(self, response):
-        self.is_loading.emit(False)
-        self.data_b = response.json().get("data", {}).get("indicators", {}) if response.status_code == 200 else {}
-        # Tudo pronto! Avisa a tela para desenhar.
-        self.comparison_ready.emit(self.data_a, self.data_b)
-
-    def _on_error(self, msg):
-        self.is_loading.emit(False)
-        self.error_occurred.emit(msg)
-
     def fetch_multi_case_data(self, case_ids: list, granularity: str, element_id: str = "ALL"):
-        """Envia os IDs e a granularidade para a nova rota de BI do Backend."""
+        """Envia os IDs e a granularidade para a rota de BI do Backend."""
         payload = {
             "case_ids": case_ids,
             "granularity": granularity,
@@ -94,11 +43,10 @@ class ComparisonViewModel(QObject):
         }
         
         try:
-            # Chama o endpoint que acabamos de criar no FastAPI
+            # Chama o endpoint no FastAPI para análise múltipla
             response = requests.post(f"{self.api_url}/analysis/multi-compare", json=payload)
             
             if response.status_code == 200:
-                # Dispara o JSON pronto para a Interface
                 self.comparison_data_ready.emit(response.json())
             else:
                 self.error_occurred.emit(f"Erro na análise: {response.text}")
@@ -107,25 +55,7 @@ class ComparisonViewModel(QObject):
             self.error_occurred.emit(f"Erro de conexão: {str(e)}")
 
     def fetch_time_series_data(self, case_ids: list):
-        try:
-            # Abra a sessão com o banco (ajuste 'SessionLocal()' para o padrão do seu projeto)
-            with SessionLocal() as session: 
-                use_case = MultiCompareCasesUseCase(session)
-                
-                # Busca as séries de Carga ("Load")
-                result_data = use_case.execute(case_ids, series_type="Load")
-                
-                # Dispara o sinal enviando o dicionário para o Frontend
-                self.time_series_data_ready.emit(result_data)
-                
-        except Exception as e:
-            if hasattr(self, 'error_occurred'):
-                self.error_occurred.emit(f"Erro ao buscar Séries Temporais: {str(e)}")
-            else:
-                print(f"Erro: {e}")
-
-    def fetch_time_series_data(self, case_ids: list):
-        # 1. Abre a conexão com o banco
+        """Busca os dados de séries temporais diretamente no banco via Use Case."""
         session = SessionLocal() 
         try:
             use_case = MultiCompareTimeSeriesUseCase(session)
@@ -133,10 +63,10 @@ class ComparisonViewModel(QObject):
             self.time_series_data_ready.emit(result_data)
             
         except Exception as e:
-            if hasattr(self, 'error_occurred'):
-                self.error_occurred.emit(f"Erro ao buscar Séries Temporais: {str(e)}")
-            else:
-                print(f"Erro: {e}")
+            self.error_occurred.emit(f"Erro ao buscar Séries Temporais: {str(e)}")
         finally:
-            # 4. Fecha a conexão com o banco para não travar o sistema
             session.close()
+
+    def _on_error(self, msg):
+        self.is_loading.emit(False)
+        self.error_occurred.emit(msg)

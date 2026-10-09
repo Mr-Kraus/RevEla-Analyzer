@@ -1,0 +1,1 @@
+pyside6-rcc ui/resources.qrc -o ui/resources_rc.py #LEMBRAR DE TROCAR O PYSIDE6 POR PYQT6

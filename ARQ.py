@@ -8,7 +8,7 @@ def registrar_arquitetura(diretorio_raiz, arquivo_saida="arquitetura.txt"):
     with open(arquivo_saida, "w", encoding="utf-8") as f:
         for raiz, diretorios, arquivos in os.walk(diretorio_raiz):
             # Ignora pastas ocultas, cache e ambientes virtuais comuns
-            diretorios[:] = [d for d in diretorios if not d.startswith(('.', '__', 'venv', 'node_modules'))]
+            diretorios[:] = [d for d in diretorios if not d.startswith(('.', '__', 'venv', 'node_modules')) and d.lower() !='revela']
             
             # Calcula o nível de indentação atual
             nivel = raiz.replace(diretorio_raiz, '').count(os.sep)

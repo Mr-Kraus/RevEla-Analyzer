@@ -1,160 +1,304 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QComboBox, QFrame, QMessageBox, QGridLayout)
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QRadioButton, QButtonGroup,
+    QTableWidget, QTableWidgetItem, QHeaderView, QScrollArea, QFrame, QCheckBox
+)
 from PyQt6.QtCore import Qt
-from ui.viewmodels.global_analysis_viewmodel import GlobalAnalysisViewModel
-from ui.services.settings_service import SettingsService
+
+# Assumindo que você possui um TabGlobalViewModel; caso contrário, adapte para o seu ViewModel
+from ui.viewmodels.settings_viewmodel import SettingsViewModel
+
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.sans-serif'] = ['Arial']
 
 
-class GlobalAnalysisView(QWidget):
+class TabGlobalView(QWidget):
     def __init__(self):
         super().__init__()
-        self.viewmodel = GlobalAnalysisViewModel()
-        self.case_mapping = {} # Para associar o nome do caso ao seu UUID
+        self.settings_vm = SettingsViewModel()
+        
+        # Dados de exemplo / Cache
+        self.current_cases = []
+        self.current_indicators = ["LOLE", "EENS", "LOLF", "LOLD", "EPNS", "LOLP"]
+        self.current_data = {} 
+        
         self.setup_ui()
-        self.setup_connections()
 
     def setup_ui(self):
+        self.setStyleSheet("""
+        QWidget { font-family: "Segoe UI", Arial, sans-serif; color: #0F172A; font-weight: normal; background-color: #F8FAFC; }
+        QRadioButton { font-size: 14px; color: #334155; }
+        QTableWidget { border: 1px solid #CBD5E1; background-color: #FFFFFF; alternate-background-color: #F8FAFC; }
+        QHeaderView::section { background-color: #F1F5F9; color: #334155; padding: 8px; border: none; border-bottom: 1px solid #CBD5E1; font-weight: normal; }
+        QScrollArea { border: none; background-color: transparent; }
+        """)
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
 
-        # Cabeçalho e Seletor
-        top_bar = QHBoxLayout()
-        title = QLabel("Global Analysis")
-        title.setStyleSheet("font-size: 28px; font-weight: bold; color: #2C3E50;")
+        # ==========================================
+        # CONTROLES SUPERIORES (Modo de Exibição)
+        # ==========================================
+        top_layout = QHBoxLayout()
         
-        self.case_selector = QComboBox()
-        self.case_selector.setFixedWidth(300)
-        self.case_selector.setFixedHeight(35)
-        self.case_selector.addItem("Select a case...")
-        self.case_selector.setStyleSheet("padding: 5px; font-size: 14px;")
+        lbl_view = QLabel("Modo de Exibição:")
+        lbl_view.setStyleSheet("font-size: 15px; color: #1E293B;")
+        top_layout.addWidget(lbl_view)
         
-        top_bar.addWidget(title)
-        top_bar.addStretch()
-        top_bar.addWidget(QLabel("Base Case: "))
-        top_bar.addWidget(self.case_selector)
+        self.view_group = QButtonGroup(self)
+        self.rad_single = QRadioButton("Tabela Única (Comparativo)")
+        self.rad_separated = QRadioButton("Tabelas Separadas (Roláveis)")
+        self.rad_single.setChecked(True)
         
-        layout.addLayout(top_bar)
+        self.view_group.addButton(self.rad_single)
+        self.view_group.addButton(self.rad_separated)
+        
+        # Recarrega o layout quando o usuário troca a opção
+        self.rad_single.toggled.connect(self.render_layout)
+        
+        top_layout.addWidget(self.rad_single)
+        top_layout.addWidget(self.rad_separated)
+        top_layout.addStretch()
+        
+        layout.addLayout(top_layout)
 
         # ==========================================
-        # CARDS DE INDICADORES (GRID)
+        # ÁREA DE CONTEÚDO (Scrollável)
         # ==========================================
-        self.cards_grid = QGridLayout()
-        self.cards_grid.setSpacing(20)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(30)
         
-        # Variáveis de Referência dos Indicadores Matemáticos
-        self.val_lole = self.create_indicator_card("LOLE (h/ano)", self.cards_grid, 0, 0)
-        self.val_epns = self.create_indicator_card("EPNS (MW)", self.cards_grid, 0, 1)
-        self.val_eens = self.create_indicator_card("EENS (MWh)", self.cards_grid, 0, 2)
-        
-        self.val_lolp = self.create_indicator_card("LOLP", self.cards_grid, 1, 0)
-        self.val_lolf = self.create_indicator_card("LOLF (occ/ano)", self.cards_grid, 1, 1)
-        self.val_lold = self.create_indicator_card("LOLD (h/occ)", self.cards_grid, 1, 2)
-
-        # Variáveis de Referência dos Metadados (Configurações do Caso)
-        self.val_analysis_type = self.create_indicator_card("Type of Analysis", self.cards_grid, 2, 0)
-        self.val_beta = self.create_indicator_card("Convergence (Beta)", self.cards_grid, 2, 1)
-        self.val_years = self.create_indicator_card("Simulated Years", self.cards_grid, 2, 2)
-
-        layout.addLayout(self.cards_grid)
-        layout.addStretch() # Empurra tudo para cima
-
-    def create_indicator_card(self, title_text: str, grid: QGridLayout, row: int, col: int) -> QLabel:
-        frame = QFrame()
-        frame.setStyleSheet("QFrame { background-color: white; border-radius: 8px; border: 1px solid #BDC3C7; }")
-        
-        frame_layout = QVBoxLayout(frame)
-        frame_layout.setContentsMargins(20, 20, 20, 20)
-        
-        lbl_title = QLabel(title_text)
-        lbl_title.setStyleSheet("color: #7F8C8D; font-size: 14px; font-weight: bold; border: none;")
-        
-        lbl_value = QLabel("-") # Valor inicial vazio
-        lbl_value.setStyleSheet("color: #2980B9; font-size: 26px; font-weight: bold; border: none;")
-        
-        frame_layout.addWidget(lbl_title)
-        frame_layout.addWidget(lbl_value)
-        
-        grid.addWidget(frame, row, col)
-        return lbl_value
-
-    def setup_connections(self):
-        self.viewmodel.cases_loaded.connect(self.populate_cases)
-        self.viewmodel.analysis_loaded.connect(self.update_indicators)
-        self.viewmodel.error_occurred.connect(self.show_error)
-        
-        # Quando o usuário escolhe um caso diferente no dropdown
-        self.case_selector.currentIndexChanged.connect(self.on_case_selected)
+        self.scroll_area.setWidget(self.content_widget)
+        layout.addWidget(self.scroll_area)
 
     def load_data(self):
-        """Chamado pela MainWindow toda vez que entra na aba"""
-        self.viewmodel.load_cases()
-
-    def populate_cases(self, cases: list):
-        # Evita disparar o evento de "changed" enquanto popula
-        self.case_selector.blockSignals(True)
-        self.case_selector.clear()
-        self.case_selector.addItem("Select a case...")
-        self.case_mapping.clear()
+        """
+        Método chamado pela MainWindow ou ViewModel para injetar os dados reais.
+        Substitua este mock pela integração real com sua API/ViewModel.
+        """
+        # --- MOCK DE DADOS PARA DEMONSTRAÇÃO ---
+        self.current_cases = [
+            {"id": "c1", "name": "Caso Base 2025"},
+            {"id": "c2", "name": "Expansão Eólica"},
+            {"id": "c3", "name": "Seca Severa"}
+        ]
         
-        for case in cases:
-            display = f"{case.get('external_name')} - {case.get('display_name')}"
-            self.case_selector.addItem(display)
-            self.case_mapping[display] = case.get("id")
-            
-        self.case_selector.blockSignals(False)
-
-    def on_case_selected(self, index):
-        if index > 0: # Ignora o "Selecione um caso..."
-            selected_text = self.case_selector.currentText()
-            case_id = self.case_mapping.get(selected_text)
-            if case_id:
-                # Reseta a tela
-                self.val_lole.setText("Calculando...")
-                self.val_epns.setText("Calculando...")
-                self.val_eens.setText("Calculando...")
-                self.val_lolp.setText("Calculando...")
-                self.val_lolf.setText("Calculando...")
-                self.val_lold.setText("Calculando...")
-                
-                self.val_analysis_type.setText("-")
-                self.val_beta.setText("-")
-                self.val_years.setText("-")
-                
-                # Aciona a API
-                self.viewmodel.load_analysis(case_id)
-
-    def update_indicators(self, data: dict):
-        """Recebe o pacote completo do ViewModel e descasca as informações nas áreas corretas"""
-        settings = SettingsService.get_instance()
+        self.current_data = {
+            "c1": {"LOLE": 12.5, "EENS": 340.2, "LOLF": 2.1, "LOLD": 5.9, "EPNS": 150.0, "LOLP": 0.0014},
+            "c2": {"LOLE": 8.2, "EENS": 210.5, "LOLF": 1.5, "LOLD": 5.4, "EPNS": 90.0, "LOLP": 0.0009},
+            "c3": {"LOLE": 45.0, "EENS": 1250.0, "LOLF": 5.8, "LOLD": 7.7, "EPNS": 450.0, "LOLP": 0.0051},
+        }
+        # ---------------------------------------
         
-        # Desempacota as gavetas mastigadas pelo ViewModel
-        indicators = data.get("indicators", {})
-        general_info = data.get("general_info", {})
+        self.render_layout()
 
-        def extract_val(key: str) -> float:
-            item = indicators.get(key, 0)
-            if isinstance(item, dict):
-                val = item.get("value", 0)
+    def render_layout(self):
+        """Limpa o layout e constrói a exibição baseada no RadioButton selecionado."""
+        # Limpa todos os widgets anteriores
+        for i in reversed(range(self.content_layout.count())): 
+            widget_to_remove = self.content_layout.itemAt(i).widget()
+            if widget_to_remove:
+                widget_to_remove.setParent(None)
             else:
-                val = item
-            try:
-                return float(val) if val is not None else 0.0
-            except (ValueError, TypeError):
-                return 0.0
+                layout_to_remove = self.content_layout.itemAt(i).layout()
+                if layout_to_remove:
+                    self.clear_layout_recursively(layout_to_remove)
 
-        # --- PREENCHE OS INDICADORES DE CONFIABILIDADE ---
-        self.val_lole.setText(settings.format_number(extract_val('LOLE'), is_table=True))
-        self.val_epns.setText(settings.format_number(extract_val('EPNS'), is_table=True))
-        self.val_eens.setText(settings.format_number(extract_val('EENS'), is_table=True))
-        self.val_lolp.setText(settings.format_number(extract_val('LOLP'), is_table=True, is_lolp=True))
-        self.val_lolf.setText(settings.format_number(extract_val('LOLF'), is_table=True))
-        self.val_lold.setText(settings.format_number(extract_val('LOLD'), is_table=True))
+        if not self.current_cases:
+            lbl_empty = QLabel("Nenhum caso carregado para análise global.")
+            self.content_layout.addWidget(lbl_empty)
+            return
 
-        # --- PREENCHE OS METADADOS DE SIMULAÇÃO ---
-        self.val_analysis_type.setText(str(general_info.get("Tipo de Análise", "N/A")))
-        self.val_beta.setText(str(general_info.get("Convergência (Beta)", "N/A")))
-        self.val_years.setText(str(general_info.get("Anos Simulados", "N/A")))
+        if self.rad_single.isChecked():
+            self.build_single_table_mode()
+        else:
+            self.build_separated_tables_mode()
 
-    def show_error(self, msg):
-        QMessageBox.warning(self, "Erro", msg)
+    def clear_layout_recursively(self, layout):
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.setParent(None)
+                else:
+                    self.clear_layout_recursively(item.layout())
+
+    # =========================================================
+    # CONSTRUTORES DE MODOS DE EXIBIÇÃO
+    # =========================================================
+    def build_single_table_mode(self):
+        """Constrói uma única tabela com todos os casos, e os gráficos no final."""
+        config = self.settings_vm.load_settings()
+        decimais = config.get("precisao_tabelas", 2)
+        
+        # 1. Tabela Única
+        table = QTableWidget()
+        headers = ["Indicador"] + [c["name"] for c in self.current_cases]
+        table.setColumnCount(len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        table.setRowCount(len(self.current_indicators))
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(True)
+        
+        for row, ind in enumerate(self.current_indicators):
+            table.setItem(row, 0, QTableWidgetItem(ind))
+            for col, case in enumerate(self.current_cases):
+                val = self.current_data.get(case["id"], {}).get(ind, 0.0)
+                item_val = QTableWidgetItem(f"{val:.{decimais}f}")
+                item_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                table.setItem(row, col + 1, item_val)
+                
+        # Ajusta a altura da tabela baseada no conteúdo
+        table.setFixedHeight(40 + (len(self.current_indicators) * 30))
+        self.content_layout.addWidget(table)
+        
+        # 2. Espaço vazio flexível (opcional, para empurrar pro fundo se a tela for muito grande)
+        self.content_layout.addSpacing(20)
+        
+        # 3. Gráficos Comparativos Lado a Lado (Com todos os casos)
+        charts_layout = QHBoxLayout()
+        
+        canvas_lole_eens = self.create_dual_axis_chart(self.current_cases, "LOLE", "EENS")
+        canvas_lolf_lold = self.create_dual_axis_chart(self.current_cases, "LOLF", "LOLD")
+        
+        charts_layout.addWidget(canvas_lole_eens)
+        charts_layout.addWidget(canvas_lolf_lold)
+        
+        chart_container = QWidget()
+        chart_container.setLayout(charts_layout)
+        chart_container.setMinimumHeight(350)
+        
+        self.content_layout.addWidget(chart_container)
+        self.content_layout.addStretch()
+
+    def build_separated_tables_mode(self):
+        """Constrói blocos contendo Tabela + Gráficos exclusivos para CADA caso."""
+        config = self.settings_vm.load_settings()
+        decimais = config.get("precisao_tabelas", 2)
+        
+        for case in self.current_cases:
+            # Container do Caso (Cartão)
+            case_frame = QFrame()
+            case_frame.setStyleSheet("QFrame { border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF; }")
+            case_layout = QVBoxLayout(case_frame)
+            case_layout.setContentsMargins(15, 15, 15, 15)
+            case_layout.setSpacing(15)
+            
+            # Título do Caso
+            lbl_title = QLabel(f"Análise: {case['name']}")
+            lbl_title.setStyleSheet("font-size: 16px; color: #0284C7; border: none;")
+            case_layout.addWidget(lbl_title)
+            
+            # 1. Tabela Individual do Caso
+            table = QTableWidget()
+            table.setColumnCount(2)
+            table.setHorizontalHeaderLabels(["Indicador", "Valor"])
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            table.verticalHeader().setVisible(False)
+            table.setAlternatingRowColors(True)
+            table.setStyleSheet("border: 1px solid #CBD5E1;")
+            table.setRowCount(len(self.current_indicators))
+            
+            for row, ind in enumerate(self.current_indicators):
+                val = self.current_data.get(case["id"], {}).get(ind, 0.0)
+                item_ind = QTableWidgetItem(ind)
+                item_val = QTableWidgetItem(f"{val:.{decimais}f}")
+                item_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                
+                table.setItem(row, 0, item_ind)
+                table.setItem(row, 1, item_val)
+                
+            table.setFixedHeight(40 + (len(self.current_indicators) * 30))
+            case_layout.addWidget(table)
+            
+            # 2. Gráficos Comparativos Lado a Lado (Apenas com dados deste caso)
+            charts_layout = QHBoxLayout()
+            
+            # Enviamos uma lista com apenas o caso atual para o construtor do gráfico
+            canvas_lole_eens = self.create_dual_axis_chart([case], "LOLE", "EENS")
+            canvas_lolf_lold = self.create_dual_axis_chart([case], "LOLF", "LOLD")
+            
+            # Removemos a borda nativa do canvas para ficar limpo dentro do frame
+            canvas_lole_eens.setStyleSheet("border: none;")
+            canvas_lolf_lold.setStyleSheet("border: none;")
+            
+            charts_layout.addWidget(canvas_lole_eens)
+            charts_layout.addWidget(canvas_lolf_lold)
+            
+            chart_container = QWidget()
+            chart_container.setStyleSheet("border: none;")
+            chart_container.setLayout(charts_layout)
+            chart_container.setMinimumHeight(300)
+            
+            case_layout.addWidget(chart_container)
+            self.content_layout.addWidget(case_frame)
+            
+        self.content_layout.addStretch()
+
+    # =========================================================
+    # GERADOR DE GRÁFICOS (DUAL-AXIS)
+    # =========================================================
+    def create_dual_axis_chart(self, target_cases: list, ind_left: str, ind_right: str) -> FigureCanvas:
+        """
+        Cria um gráfico comparativo combinando colunas (Eixo Esq) e Linhas/Marcadores (Eixo Dir).
+        :param target_cases: Lista de dicionários de casos a serem plotados.
+        :param ind_left: Nome do indicador plotado em barras (ex: LOLE).
+        :param ind_right: Nome do indicador plotado em linhas (ex: EENS).
+        """
+        fig = Figure(figsize=(5, 3), dpi=100, facecolor='#FFFFFF')
+        ax1 = fig.add_subplot(111)
+        ax2 = ax1.twinx()
+        
+        config = self.settings_vm.load_settings()
+        decimais = config.get("precisao_grafico", 2)
+        
+        x = np.arange(len(target_cases))
+        names = [c["name"] for c in target_cases]
+        
+        # Extrai e arredonda os valores
+        val_left = [round(self.current_data.get(c["id"], {}).get(ind_left, 0.0), decimais) for c in target_cases]
+        val_right = [round(self.current_data.get(c["id"], {}).get(ind_right, 0.0), decimais) for c in target_cases]
+        
+        # Plota Barras no eixo 1 (Azul Claro)
+        ax1.bar(x, val_left, color='#38BDF8', width=0.4, label=ind_left, edgecolor='white')
+        
+        # Plota Marcadores no eixo 2 (Laranja)
+        # Usa linha se houver mais de 1 caso, ou apenas o ponto se for 1 caso isolado.
+        marker_style = '-o' if len(target_cases) > 1 else 'o'
+        ax2.plot(x, val_right, marker_style, color='#F59E0B', linewidth=2, markersize=8, label=ind_right)
+        
+        # Formatação
+        ax1.set_xticks(x)
+        # Se for um único caso, o nome fica reto. Se for múltiplo, rotaciona levemente.
+        ax1.set_xticklabels(names, rotation=15 if len(target_cases) > 1 else 0, ha='center' if len(target_cases) == 1 else 'right')
+        
+        ax1.set_ylabel(ind_left, color='#0284C7')
+        ax2.set_ylabel(ind_right, color='#D97706')
+        
+        # Limpando o visual
+        ax1.spines['top'].set_visible(False)
+        ax2.spines['top'].set_visible(False)
+        ax1.grid(axis='y', linestyle='--', alpha=0.3)
+        
+        # Legenda limpa no topo central
+        h1, l1 = ax1.get_legend_handles_labels()
+        h2, l2 = ax2.get_legend_handles_labels()
+        fig.legend(h1+h2, l1+l2, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=2, frameon=False)
+        
+        fig.tight_layout()
+        
+        # Dá um pequeno respiro no topo para acomodar a legenda externa
+        fig.subplots_adjust(top=0.85)
+        
+        return FigureCanvas(fig)

@@ -3,6 +3,9 @@ from PyQt6.QtWidgets import QApplication
 from ui.views.login_view import LoginView
 from ui.themes.styles import GlobalStyles
 from ui.themes.styles import GlobalStyles
+import ui.resources_rc
+
+from ui.themes.styles import GlobalStyles
 
 def main():
     app = QApplication(sys.argv)

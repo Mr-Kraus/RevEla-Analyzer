@@ -5,7 +5,7 @@ import matplotlib.colors as mcolors
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QComboBox,
     QLineEdit, QPushButton, QGroupBox, QMessageBox, QScrollArea,
-    QCheckBox
+    QRadioButton
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor
@@ -53,12 +53,8 @@ class SettingsView(QWidget):
         main_layout.setContentsMargins(24, 22, 24, 22)
         main_layout.setSpacing(16)
 
-        # =====================================================================
-        # TODO O CSS GIGANTE FOI REMOVIDO DAQUI! 
-        # O aplicativo agora puxa os estilos automaticamente do main.py
-        # =====================================================================
-
         title = QLabel("Configurações Globais do Sistema")
+        # Mantendo um design simples de título integrado às cores globais
         title.setStyleSheet("font-size: 26px; font-weight: 800; color: #0F172A; margin-bottom: 4px; background-color: transparent;")
         main_layout.addWidget(title)
 
@@ -130,37 +126,77 @@ class SettingsView(QWidget):
         layout_content.addWidget(group_report)
 
         # ==========================================
-        # 3. Módulos de Interesse
+        # 3. Módulos de Interesse (Utilizando Radio Buttons)
         # ==========================================
         group_modules = QGroupBox("Módulos e Abas Ativas")
         layout_modules = QVBoxLayout(group_modules)
         layout_modules.setSpacing(6)
         
-        self.chk_confiabilidade = QCheckBox("Análise de Confiabilidade")
-        self.chk_rede = QCheckBox("Análise de Rede")
-        self.chk_geracao = QCheckBox("Análise de Geração")
-        self.chk_veiculos = QCheckBox("Modelo de Veículos Elétricos")
-        self.chk_gest_proc = QCheckBox("Modelo de Gestão de Processos")
+        self.rad_confiabilidade = QRadioButton("Análise de Confiabilidade")
+        self.rad_rede = QRadioButton("Análise de Rede")
+        self.rad_geracao = QRadioButton("Análise de Geração")
+        self.rad_veiculos = QRadioButton("Modelo de Veículos Elétricos")
+        self.rad_gest_proc = QRadioButton("Modelo de Gestão de Processos")
 
-        for chk in (self.chk_confiabilidade, self.chk_rede, self.chk_geracao, self.chk_veiculos, self.chk_gest_proc):
-            layout_modules.addLayout(self._create_aligned_checkbox(chk))
+        # Permitir multiseleção desabilitando exclusividade nativa
+        for rad in (self.rad_confiabilidade, self.rad_rede, self.rad_geracao, self.rad_veiculos, self.rad_gest_proc):
+            rad.setAutoExclusive(False)
+
+        # Desabilitando e aplicando transparência para as opções de implementação futura
+        disabled_style = "color: #94A3B8;" # Cor correspondente ao text_disabled do styles.py
+
+        self.rad_rede.setChecked(False)
+        self.rad_rede.setEnabled(False)
+        self.rad_rede.setStyleSheet(disabled_style)
+
+        self.rad_geracao.setChecked(False)
+        self.rad_geracao.setEnabled(False)
+        self.rad_geracao.setStyleSheet(disabled_style)
+
+        self.rad_veiculos.setChecked(False)
+        self.rad_veiculos.setEnabled(False)
+        self.rad_veiculos.setStyleSheet(disabled_style)
+
+        self.rad_gest_proc.setChecked(False)
+        self.rad_gest_proc.setEnabled(False)
+        self.rad_gest_proc.setStyleSheet(disabled_style)
+
+        for rad in (self.rad_confiabilidade, self.rad_rede, self.rad_geracao, self.rad_veiculos, self.rad_gest_proc):
+            layout_modules.addLayout(self._create_aligned_radio(rad))
         layout_content.addWidget(group_modules)
 
         # ==========================================
-        # 4. Filtro de Indicadores
+        # 4. Filtro de Indicadores (Utilizando Radio Buttons)
         # ==========================================
         group_indicators = QGroupBox("Indicadores de Monitoramento")
         layout_indicators = QVBoxLayout(group_indicators)
         layout_indicators.setSpacing(6)
 
-        self.chk_ind_custo = QCheckBox("Indicadores Financeiros")
-        self.chk_ind_carga = QCheckBox("Indicadores de Demanda")
-        self.chk_ind_gerais = QCheckBox("Indicadores Sistêmicos")
-        self.chk_ind_transicao = QCheckBox("Monitoramento de Transição Energética")
-        self.chk_ind_funcionalidade = QCheckBox("Índices de Saúde do Equipamento")
+        self.rad_ind_custo = QRadioButton("Indicadores Financeiros")
+        self.rad_ind_carga = QRadioButton("Indicadores de Demanda")
+        self.rad_ind_gerais = QRadioButton("Indicadores Sistêmicos")
+        self.rad_ind_transicao = QRadioButton("Monitoramento de Transição Energética")
+        self.rad_ind_funcionalidade = QRadioButton("Índices de Saúde do Equipamento")
 
-        for chk in (self.chk_ind_custo, self.chk_ind_carga, self.chk_ind_gerais, self.chk_ind_transicao, self.chk_ind_funcionalidade):
-            layout_indicators.addLayout(self._create_aligned_checkbox(chk))
+        # Permitir multiseleção desabilitando exclusividade nativa
+        for rad in (self.rad_ind_custo, self.rad_ind_carga, self.rad_ind_gerais, self.rad_ind_transicao, self.rad_ind_funcionalidade):
+            rad.setAutoExclusive(False)
+
+        # Desabilitando opções futuras
+        self.rad_ind_gerais.setChecked(False)
+        self.rad_ind_gerais.setEnabled(False)
+        self.rad_ind_gerais.setStyleSheet(disabled_style)
+
+        self.rad_ind_transicao.setChecked(False)
+        self.rad_ind_transicao.setEnabled(False)
+        self.rad_ind_transicao.setStyleSheet(disabled_style)
+
+        self.rad_ind_funcionalidade.setChecked(False)
+        self.rad_ind_funcionalidade.setEnabled(False)
+        self.rad_ind_funcionalidade.setStyleSheet(disabled_style)
+
+        for rad in (self.rad_ind_custo, self.rad_ind_carga, self.rad_ind_gerais, self.rad_ind_transicao, self.rad_ind_funcionalidade):
+            layout_indicators.addLayout(self._create_aligned_radio(rad))
         layout_content.addWidget(group_indicators)
 
         # ==========================================
@@ -197,9 +233,8 @@ class SettingsView(QWidget):
         lbl = QLabel(label_text)
         lbl.setFixedWidth(310)
         lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        lbl.setStyleSheet("font-size: 14px; color: #475569; font-weight: 600; background-color: transparent;")
+        lbl.setStyleSheet("font-size: 14px; font-weight: 600; background-color: transparent;")
         
-        # Define a largura fixa de 220px via Python (antes estava no CSS)
         widget.setFixedWidth(220)
 
         layout.addWidget(lbl)
@@ -207,7 +242,7 @@ class SettingsView(QWidget):
         layout.addStretch()
         return layout
 
-    def _create_aligned_checkbox(self, checkbox):
+    def _create_aligned_radio(self, radio_button):
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 2, 0, 2)
         layout.setSpacing(18)
@@ -216,7 +251,7 @@ class SettingsView(QWidget):
         spacer.setFixedWidth(310)
         
         layout.addWidget(spacer)
-        layout.addWidget(checkbox)
+        layout.addWidget(radio_button)
         layout.addStretch()
         return layout
 
@@ -235,69 +270,33 @@ class SettingsView(QWidget):
     def load_data(self):
         config = self.viewmodel.load_settings()
 
-        self.spin_table_dec.setValue(
-            config["precisao_tabelas"]
-        )
-        self.spin_chart_dec.setValue(
-            config["precisao_grafico"]
-        )
-        self.combo_lolp.setCurrentText(
-            config["formato_lolp"]
-        )
+        self.spin_table_dec.setValue(config["precisao_tabelas"])
+        self.spin_chart_dec.setValue(config["precisao_grafico"])
+        self.combo_lolp.setCurrentText(config["formato_lolp"])
 
-        self.combo_img_type.setCurrentText(
-            config["tipo_imagem_relatorio"]
-        )
-        self.combo_font.setCurrentText(
-            config["tipo_fonte_relatorio"]
-        )
-        self.spin_font_size.setValue(
-            config["tamanho_fonte_relatorio"]
-        )
+        self.combo_img_type.setCurrentText(config["tipo_imagem_relatorio"])
+        self.combo_font.setCurrentText(config["tipo_fonte_relatorio"])
+        self.spin_font_size.setValue(config["tamanho_fonte_relatorio"])
 
-        idx_color = self.combo_font_color.findData(
-            config["cor_fonte_relatorio"]
-        )
+        idx_color = self.combo_font_color.findData(config["cor_fonte_relatorio"])
         if idx_color >= 0:
             self.combo_font_color.setCurrentIndex(idx_color)
 
-        idx_pal = self.combo_chart_style.findData(
-            config["estilo_grafico_relatorio"]
-        )
+        idx_pal = self.combo_chart_style.findData(config["estilo_grafico_relatorio"])
         if idx_pal >= 0:
             self.combo_chart_style.setCurrentIndex(idx_pal)
 
-        self.chk_confiabilidade.setChecked(
-            config["analise_confiabilidade"]
-        )
-        self.chk_rede.setChecked(
-            config["analise_rede"]
-        )
-        self.chk_geracao.setChecked(
-            config["analise_geracao"]
-        )
-        self.chk_veiculos.setChecked(
-            config["modelo_veiculos_eletricos"]
-        )
-        self.chk_gest_proc.setChecked(
-            config["modelo_gest_proc"]
-        )
+        self.rad_confiabilidade.setChecked(config["analise_confiabilidade"])
+        #self.rad_rede.setChecked(config["analise_rede"])
+        #self.rad_geracao.setChecked(config["analise_geracao"])
+        #self.rad_veiculos.setChecked(config["modelo_veiculos_eletricos"])
+        #self.rad_gest_proc.setChecked(config["modelo_gest_proc"])
 
-        self.chk_ind_custo.setChecked(
-            config["indicador_custo"]
-        )
-        self.chk_ind_carga.setChecked(
-            config["indicador_carga"]
-        )
-        self.chk_ind_gerais.setChecked(
-            config["indicador_gerais"]
-        )
-        self.chk_ind_transicao.setChecked(
-            config["indicador_transicao"]
-        )
-        self.chk_ind_funcionalidade.setChecked(
-            config["indicador_funcionalidade"]
-        )
+        self.rad_ind_custo.setChecked(config["indicador_custo"])
+        self.rad_ind_carga.setChecked(config["indicador_carga"])
+        #self.rad_ind_gerais.setChecked(config["indicador_gerais"])
+        #self.rad_ind_transicao.setChecked(config["indicador_transicao"])
+        #self.rad_ind_funcionalidade.setChecked(config["indicador_funcionalidade"])
 
         self.txt_api.setText(config["api_url"])
 
@@ -311,16 +310,19 @@ class SettingsView(QWidget):
             "tamanho_fonte_relatorio": self.spin_font_size.value(),
             "cor_fonte_relatorio": self.combo_font_color.currentData(),
             "estilo_grafico_relatorio": self.combo_chart_style.currentData(),
-            "analise_confiabilidade": self.chk_confiabilidade.isChecked(),
-            "analise_rede": self.chk_rede.isChecked(),
-            "analise_geracao": self.chk_geracao.isChecked(),
-            "modelo_veiculos_eletricos": self.chk_veiculos.isChecked(),
-            "modelo_gest_proc": self.chk_gest_proc.isChecked(),
-            "indicador_custo": self.chk_ind_custo.isChecked(),
-            "indicador_carga": self.chk_ind_carga.isChecked(),
-            "indicador_gerais": self.chk_ind_gerais.isChecked(),
-            "indicador_transicao": self.chk_ind_transicao.isChecked(),
-            "indicador_funcionalidade": self.chk_ind_funcionalidade.isChecked(),
+            
+            "analise_confiabilidade": self.rad_confiabilidade.isChecked(),
+            "analise_rede": self.rad_rede.isChecked(),
+            "analise_geracao": self.rad_geracao.isChecked(),
+            "modelo_veiculos_eletricos": self.rad_veiculos.isChecked(),
+            "modelo_gest_proc": self.rad_gest_proc.isChecked(),
+            
+            "indicador_custo": self.rad_ind_custo.isChecked(),
+            "indicador_carga": self.rad_ind_carga.isChecked(),
+            "indicador_gerais": self.rad_ind_gerais.isChecked(),
+            "indicador_transicao": self.rad_ind_transicao.isChecked(),
+            "indicador_funcionalidade": self.rad_ind_funcionalidade.isChecked(),
+            
             "api_url": self.txt_api.text().strip()
         }
 
