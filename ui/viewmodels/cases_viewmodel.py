@@ -13,6 +13,9 @@ class CasesViewModel(QObject):
     import_started = pyqtSignal()
     import_success = pyqtSignal(str)
     import_failed = pyqtSignal(str)
+    
+    # NOVO SINAL: Avisa a tela que a descoberta terminou e entrega as listas de arquivos
+    discovery_completed = pyqtSignal(str, dict) 
 
     def __init__(self):
         super().__init__()
@@ -33,12 +36,10 @@ class CasesViewModel(QObject):
         else:
             self.error_occurred.emit("Erro ao carregar a lista de casos.")
 
-    def import_case(self, folder_path: str, display_name: str, software_version: str = "RELEVA"):
+    def discover_case(self, folder_path: str, display_name: str):
+        """Etapa 1: Faz a varredura da pasta no backend"""
         self.import_started.emit()
         folder_name = os.path.basename(folder_path)
-        
-        # Salva a versão na classe para usarmos no próximo passo
-        self.current_software_version = software_version 
         
         payload = {
             "external_name": folder_name[:10],
@@ -47,53 +48,58 @@ class CasesViewModel(QObject):
         }
         
         self._reg_worker = self.api_client.make_request_async("POST", "/cases", json=payload)
-        self._reg_worker.finished.connect(self._on_case_registered)
+        self._reg_worker.finished.connect(self._on_case_discovered)
         self._reg_worker.error.connect(self.import_failed.emit)
         self._reg_worker.start()
 
-    def _on_case_registered(self, response):
+    def _on_case_discovered(self, response):
         if response.status_code == 200:
             resp_data = response.json()
             if resp_data.get("success"):
                 data = resp_data.get("data", {})
                 self.current_case_id = data.get("id")
+                discovery_details = data.get("discovery_details", {})
                 
-                # Monta o payload enviando a versão selecionada para a Rota do FastAPI
-                import_payload = {"software_version": getattr(self, 'current_software_version', 'RELEVA')}
-                
-                # Dispara a requisição de Ingestão
-                self._ingest_worker = self.api_client.make_request_async(
-                    "POST", 
-                    f"/cases/{self.current_case_id}/import",
-                    json=import_payload
-                )
-                self._ingest_worker.finished.connect(self._on_case_ingested)
-                self._ingest_worker.error.connect(self.import_failed.emit)
-                self._ingest_worker.start()
+                # Avisa a interface gráfica para abrir o pop-up com as opções!
+                self.discovery_completed.emit(self.current_case_id, discovery_details)
             else:
-                self.import_failed.emit(f"Falha ao registrar: {resp_data.get('message')}")
+                self.import_failed.emit(f"Falha na descoberta: {resp_data.get('message')}")
         else:
             self.import_failed.emit(f"Falha de comunicação com o servidor (Status {response.status_code}).")
+
+    def run_import(self, case_id: str, template: str, results_dir: str, software_version: str):
+        """Etapa 2: Executa a importação real após o usuário escolher no pop-up"""
+        import_payload = {
+            "software_version": software_version,
+            "selected_template": template,
+            "selected_results": results_dir
+        }
+        
+        self._ingest_worker = self.api_client.make_request_async(
+            "POST", 
+            f"/cases/{case_id}/import",
+            json=import_payload
+        )
+        self._ingest_worker.finished.connect(self._on_case_ingested)
+        self._ingest_worker.error.connect(self.import_failed.emit)
+        self._ingest_worker.start()
 
     def _on_case_ingested(self, response):
         if response.status_code == 200:
             resp_data = response.json()
-            
-            # Lê a flag de sucesso do backend ao invés de confiar só no HTTP 200
             if resp_data.get("success"):
                 self.import_success.emit("Caso importado e processado com sucesso!")
             else:
-                # O backend respondeu, mas avisou que a ingestão (leitura dos CSVs) quebrou
                 error_msg = resp_data.get("message", "Erro interno no processamento dos CSVs.")
                 self.import_failed.emit(f"O caso foi registrado, mas a ingestão falhou: {error_msg}")
                 
-            self.load_cases() # Atualiza a tabela (mostrará READY ou FAILED corretamente)
+            self.load_cases() 
         else:
             self.import_failed.emit("Erro do servidor durante o processamento dos CSVs.")
 
+    # ... (Os métodos update_case_name, load_regions, update_region_aliases e delete_case continuam iguais abaixo)
     def update_case_name(self, case_id: str, new_display_name: str):
         payload = {"display_name": new_display_name}
-        # Salva em self para não ser destruído pelo Garbage Collector!
         self._name_worker = self.api_client.make_request_async("PATCH", f"/cases/{case_id}", json=payload)
         self._name_worker.finished.connect(
             lambda resp: self.case_updated.emit() if resp.status_code == 200 else self.error_occurred.emit("Erro ao atualizar nome do caso.")
@@ -101,7 +107,6 @@ class CasesViewModel(QObject):
         self._name_worker.start()
 
     def load_regions(self, case_id: str):
-        # Salva em self para manter a thread viva!
         self._regions_worker = self.api_client.make_request_async("GET", f"/cases/{case_id}/regions")
         self._regions_worker.finished.connect(
             lambda resp: self.regions_loaded.emit(resp.json().get("data", [])) if resp.status_code == 200 else self.error_occurred.emit("Erro ao carregar regiões.")
@@ -109,12 +114,12 @@ class CasesViewModel(QObject):
         self._regions_worker.start()
 
     def update_region_aliases(self, case_id: str, regions_payload: list):
-        # Salva em self!
         self._aliases_worker = self.api_client.make_request_async("PUT", f"/cases/{case_id}/regions", json=regions_payload)
         self._aliases_worker.finished.connect(
             lambda resp: self.regions_updated.emit() if resp.status_code == 200 else self.error_occurred.emit("Erro ao atualizar apelidos.")
         )
         self._aliases_worker.start()
+        
     def delete_case(self, case_id: str):
         self._del_worker = self.api_client.make_request_async("DELETE", f"/cases/{case_id}")
         self._del_worker.finished.connect(lambda resp: self._on_case_deleted(resp, case_id))

@@ -215,7 +215,10 @@ class SettingsView(QWidget):
         # ==========================================
         # Botão Salvar
         # ==========================================
-        self.btn_save = QPushButton("Salvar Configurações Globais")
+        self.btn_save = QPushButton("Salvar Configurações")
+        #self.btn_save.setIcon(QIcon("widgets/icon_save.png"))
+        self.btn_save.setStyleSheet("color: #1A365D;")
+        self.btn_save.setIconSize(QSize(20, 20))
         self.btn_save.setFixedHeight(45)
         self.btn_save.setFixedWidth(280)
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)

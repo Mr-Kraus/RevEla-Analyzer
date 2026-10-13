@@ -326,26 +326,22 @@ class CaseAnalysisView(QWidget):
         config = self.settings_vm.load_settings()
         decimais = config.get("precisao_tabelas", 2)
         
-        # MOCK - Fallback caso a API ainda não envie essa nova estrutura
-        simulated_years = data.get("simulated_years", 20)
+        simulated_years = data.get("simulated_years", "-")
         self.lbl_sim_years.setText(f"Anos Simulados: {simulated_years}")
         
-        # 1. Tabela de Confiabilidade Global (LOLE, EENS, EPNS...)
-        reliability_data = data.get("global_reliability")
-        if not reliability_data:
-            reliability_data = [
-                {"nome": "LOLE", "valor": 12.5, "beta": 0.05},
-                {"nome": "EENS", "valor": 340.2, "beta": 0.02},
-                {"nome": "EPNS", "valor": 150.0, "beta": 0.08},
-                {"nome": "LOLP", "valor": 0.0014, "beta": 0.04},
-            ]
+        # 1. Tabela de Confiabilidade Global com Beta Real
+        reliability_data = data.get("global_reliability", [])
             
         self.table_global.setRowCount(len(reliability_data))
         for row, param in enumerate(reliability_data):
             item_nome = QTableWidgetItem(param["nome"])
             item_val = QTableWidgetItem(f"{param['valor']:.{decimais}f}")
             item_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item_beta = QTableWidgetItem(f"{(param['beta'] * 100):.1f}%")
+            
+            # Formatação segura para o Beta (caso seja float ou string)
+            beta_val = param.get('beta', 0)
+            beta_str = f"{(beta_val * 100):.1f}%" if isinstance(beta_val, float) else str(beta_val)
+            item_beta = QTableWidgetItem(beta_str)
             item_beta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             
             self.table_global.setItem(row, 0, item_nome)
@@ -353,22 +349,18 @@ class CaseAnalysisView(QWidget):
             self.table_global.setItem(row, 2, item_beta)
 
         # 2. Tabela System Summary
-        summary_data = data.get("system_summary")
-        if not summary_data:
-            summary_data = [
-                {"nome": "Rated load", "valor": 230.00, "unidade": "MW"},
-                {"nome": "Peak load", "valor": 230.00, "unidade": "MW"},
-                {"nome": "Mean load", "valor": 141.34, "unidade": "MW"},
-                {"nome": "Annual total demand", "valor": 1.24, "unidade": "TWh"},
-                {"nome": "Rated load/gen capacity", "valor": 73.72, "unidade": "%"},
-            ]
+        summary_data = data.get("system_summary", [])
             
         self.table_summary.setRowCount(len(summary_data))
         for row, param in enumerate(summary_data):
-            item_nome = QTableWidgetItem(param["nome"])
-            item_val = QTableWidgetItem(f"{param['valor']:.{decimais}f}")
+            item_nome = QTableWidgetItem(param.get("nome", ""))
+            
+            val = param.get('valor', 0)
+            val_str = f"{val:.{decimais}f}" if isinstance(val, (float, int)) else str(val)
+            item_val = QTableWidgetItem(val_str)
             item_val.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item_unit = QTableWidgetItem(param["unidade"])
+            
+            item_unit = QTableWidgetItem(param.get("unidade", ""))
             item_unit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             
             self.table_summary.setItem(row, 0, item_nome)
@@ -376,9 +368,7 @@ class CaseAnalysisView(QWidget):
             self.table_summary.setItem(row, 2, item_unit)
 
         # 3. Gráfico de Rosquinha
-        tech_data = data.get("generation_tech")
-        if not tech_data:
-            tech_data = {"Thermal": 212.00, "Hydro": 100.00}
+        tech_data = data.get("generation_tech", {})
         self.plot_donut_chart(tech_data)
 
         # 4. Gráfico de Distribuição
@@ -392,26 +382,41 @@ class CaseAnalysisView(QWidget):
     def plot_donut_chart(self, tech_data: dict):
         self.donut_ax.clear()
         
-        labels = list(tech_data.keys())
-        values = list(tech_data.values())
+        # Filtra valores estritamente zerados para não desenhar fatias invisíveis
+        filtered_data = {k: v for k, v in tech_data.items() if v > 0}
+        labels = list(filtered_data.keys())
+        values = list(filtered_data.values())
         
         if sum(values) == 0:
             self.donut_ax.text(0.5, 0.5, "Sem dados de geração", ha='center', va='center', color='#94A3B8')
         else:
-            # Propriedades do Donut
+            # LÓGICA ANTI-CONGLOMERADO: Esconde porcentagens menores que 4%
+            def custom_autopct(pct):
+                return f"{pct:.1f}%" if pct >= 4.0 else ""
+
+            # labels=None remove as palavras coladas no gráfico
             wedges, texts, autotexts = self.donut_ax.pie(
-                values, labels=labels, autopct='%1.1f%%', 
-                startangle=90, colors=self.donut_colors,
+                values, labels=None, autopct=custom_autopct, 
+                startangle=90, colors=self.donut_colors[:len(values)],
                 wedgeprops=dict(width=0.4, edgecolor='white')
             )
             
-            # Estilo dos textos
-            for text in texts: text.set_color('#334155')
             for autotext in autotexts:
                 autotext.set_color('white')
-                # A fonte normal foi solicitada
+                autotext.set_fontsize(9)
+                
+            # Cria uma legenda externa organizada
+            self.donut_ax.legend(
+                wedges, labels,
+                title="Tecnologias",
+                loc="center left",
+                bbox_to_anchor=(0.9, 0.5), # Posiciona fora da rosquinha
+                frameon=False,
+                fontsize=9
+            )
         
-        self.donut_figure.tight_layout()
+        # Abre espaço para a legenda não ser cortada
+        self.donut_figure.subplots_adjust(right=0.6)
         self.donut_canvas.draw()
 
     def plot_geral_chart(self):

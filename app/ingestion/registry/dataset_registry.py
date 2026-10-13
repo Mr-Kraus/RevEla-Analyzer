@@ -92,6 +92,7 @@ class DatasetRegistry:
             parser_identifier="TransmissionResultParser"
         ))
 
+        # 6. Resultados de ENS
         self.register(DatasetDefinition(
             dataset_code="ENS_HOURLY_RESULTS",
             filename_pattern="ENS - hourly average.csv",
@@ -100,4 +101,15 @@ class DatasetRegistry:
             required=False,
             priority=40,
             parser_identifier="ResultsTimeSeriesParser"
+        ))
+
+        # 7. SYSTEM SUMMARY 
+        self.register(DatasetDefinition(
+            dataset_code="SYSTEM_SUMMARY",
+            filename_pattern="system summary.csv", # Ajuste se o nome real for outro
+            dataset_family="Configuration",
+            dataset_type="TEMPLATE",
+            required=False,
+            priority=80,
+            parser_identifier="SystemSummaryParser"
         ))

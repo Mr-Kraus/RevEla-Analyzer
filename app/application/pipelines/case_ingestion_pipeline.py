@@ -17,12 +17,15 @@ from app.ingestion.normalizers.reliability_indices_normalizer import Reliability
 from app.application.use_cases.persist_parsed_data_use_case import PersistParsedDataUseCase
 from app.infrastructure.database.models.simulation_model import SimulationRunModel
 
-# IMPORTS DA ESTEIRA DE SÉRIES TEMPORAIS
 from app.infrastructure.database.repositories.postgres_time_series_repository import PostgresTimeSeriesRepository
 from app.ingestion.parsers.time_series_parser import TimeSeriesParser
 from app.application.use_cases.persist_time_series_use_case import PersistTimeSeriesUseCase
 from app.ingestion.parsers.results_time_series_parser import ResultsTimeSeriesParser
 from app.ingestion.normalizers.time_series_normalizer import TimeSeriesNormalizer
+
+from app.ingestion.parsers.system_summary_parser import SystemSummaryParser
+from app.infrastructure.database.mappers.system_summary_mapper import SystemSummaryMapper
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +44,10 @@ class CaseIngestionPipeline:
         """
         Executa o pipeline de ingestão completo: 
         1. Cria a simulação pai
-        2. Faz o Parsing e Normalização dos CSVs
+        2. Faz o Parsing e Normalização dos CSVs estruturais
         3. Persiste a topologia e resultados de confiabilidade
-        4. Extrai e persiste as Séries Temporais (Carga, Solar, Hidro, etc.)
+        4. Extrai e persiste o System Summary
+        5. Extrai e persiste as Séries Temporais (Input e Output)
         """
         logger.info(f"Iniciando Pipeline Completo para o Caso: {case_folder.name}")
         
@@ -54,13 +58,13 @@ class CaseIngestionPipeline:
             new_simulation = SimulationRunModel(
                 id=simulation_run_id,
                 case_id=case_id,
-                imported_at=datetime.now() # Preenchendo o campo obrigatório do banco
+                imported_at=datetime.now()
             )
             self.session.add(new_simulation)
             self.session.flush() 
 
             # =====================================================================
-            # PASSO 2: EXTRAÇÃO E NORMALIZAÇÃO DOS DADOS (Parsers e Normalizers)
+            # PASSO 2: EXTRAÇÃO E NORMALIZAÇÃO DOS DADOS ESTRUTURAIS
             # =====================================================================
             settings_files = list(case_folder.rglob("Template Settings.csv"))
             if not settings_files:
@@ -94,11 +98,23 @@ class CaseIngestionPipeline:
             )
             
             # =====================================================================
-            # PASSO 4: EXTRAÇÃO E PERSISTÊNCIA DAS SÉRIES TEMPORAIS
+            # PASSO 4: EXTRAÇÃO E PERSISTÊNCIA DO SYSTEM SUMMARY
+            # =====================================================================
+            summary_files = list(case_folder.rglob("*system summary*.csv"))
+            if summary_files:
+                logger.info("Lendo System Summary...")
+                raw_summary_dto = SystemSummaryParser.parse_file(str(summary_files[0]))
+                summary_model = SystemSummaryMapper.to_model(simulation_run_id, raw_summary_dto)
+                
+                self.session.add(summary_model)
+                self.session.flush() # Substituído commit() por flush() para não quebrar a transação!
+
+            # =====================================================================
+            # PASSO 5: EXTRAÇÃO E PERSISTÊNCIA DAS SÉRIES TEMPORAIS
             # =====================================================================
             all_canonical_series = []
             
-            # 4.1 Lendo arquivos de Entrada (Templates com Tags <VAL>)
+            # 5.1 Lendo arquivos de Entrada (Templates com Tags <VAL>)
             template_ts_map = {
                 "Template Load.txt": ("Load", "Input", "MW"),
                 "Template Solar.txt": ("Solar", "Input", "MW"),
@@ -115,26 +131,22 @@ class CaseIngestionPipeline:
                     except Exception as e:
                         logger.warning(f"Falha ao ler template '{filename}': {e}")
 
-            # 4.2 Lendo arquivos de Saída/Resultados (CSVs Limpos com G, T, G+T)
+            # 5.2 Lendo arquivos de Saída/Resultados (CSVs Limpos com G, T, G+T)
             results_ts_map = {
                 "ENS - hourly average.csv": ("ENS", "Output", "MW")
-                
             }
 
             for filename, (series_type, position, unit_y) in results_ts_map.items():
                 found_files = list(case_folder.rglob(filename))
                 if found_files:
                     try:
-                        
                         raw_ts_dto = ResultsTimeSeriesParser.parse_file(str(found_files[0]), series_type)
-                        
-                        
                         canon_ts_list = TimeSeriesNormalizer().normalize(raw_ts_dto, position=position, unit_y=unit_y)
                         all_canonical_series.extend(canon_ts_list)
                     except Exception as e:
                         logger.warning(f"Falha ao ler resultado '{filename}': {e}")
 
-            # 4.3 Persistência
+            # 5.3 Persistência
             if all_canonical_series:
                 logger.info(f"Persistindo {len(all_canonical_series)} séries temporais...")
                 self.persist_ts_use_case.execute(simulation_run_id, all_canonical_series)
@@ -142,10 +154,7 @@ class CaseIngestionPipeline:
             return True
 
         except Exception as e:
-            import traceback
             traceback.print_exc()
             self.session.rollback()
             logger.error(f"Erro crítico no pipeline de ingestão: {e}")
-            print(f"Erro crítico no pipeline de ingestão: {e}")
-            print(traceback.format_exc()) 
             return False

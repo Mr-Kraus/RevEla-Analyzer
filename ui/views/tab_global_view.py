@@ -20,7 +20,7 @@ plt.rcParams['font.sans-serif'] = ['Arial']
 # =====================================================================
 def create_dual_axis_chart(data_list: list, ind_left: str, ind_right: str) -> FigureCanvas:
     """Cria um gráfico combinando colunas (Eixo Esq) e Linhas (Eixo Dir)."""
-    fig = Figure(figsize=(5, 3), dpi=100, facecolor='#FFFFFF')
+    fig = Figure(figsize=(8, 4), dpi=100, facecolor='#FFFFFF') # Gráfico mais largo
     ax1 = fig.add_subplot(111)
     ax2 = ax1.twinx()
     
@@ -44,8 +44,9 @@ def create_dual_axis_chart(data_list: list, ind_left: str, ind_right: str) -> Fi
     ax1.set_xticks(x)
     ax1.set_xticklabels(names, rotation=15 if len(data_list) > 1 else 0, ha='center' if len(data_list) == 1 else 'right', fontsize=9)
     
-    ax1.set_ylabel(ind_left, color='#0284C7')
-    ax2.set_ylabel(ind_right, color='#D97706')
+    # LABELS MAIORES E EM NEGRITO
+    ax1.set_ylabel(ind_left, color='#0284C7', fontsize=14, fontweight='bold')
+    ax2.set_ylabel(ind_right, color='#D97706', fontsize=14, fontweight='bold')
     
     ax1.spines['top'].set_visible(False)
     ax2.spines['top'].set_visible(False)
@@ -53,10 +54,11 @@ def create_dual_axis_chart(data_list: list, ind_left: str, ind_right: str) -> Fi
     
     h1, l1 = ax1.get_legend_handles_labels()
     h2, l2 = ax2.get_legend_handles_labels()
-    fig.legend(h1+h2, l1+l2, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=2, frameon=False)
+    # LEGENDA TAMBÉM AJUSTADA
+    fig.legend(h1+h2, l1+l2, loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=2, frameon=False, fontsize=11)
     
     fig.tight_layout()
-    fig.subplots_adjust(top=0.85)
+    fig.subplots_adjust(top=0.82)
     
     return FigureCanvas(fig)
 
@@ -67,7 +69,7 @@ def create_dual_axis_chart(data_list: list, ind_left: str, ind_right: str) -> Fi
 
 class CaseDetailCard(QGroupBox):
     """Card detalhado de um caso específico para o modo 'Tabelas Separadas'."""
-    def __init__(self, data: dict): # Removido o parâmetro settings
+    def __init__(self, data: dict): 
         super().__init__()
         case_name = data.get("case_name", "Desconhecido")
         self.setTitle(f"Caso: {case_name}")
@@ -112,7 +114,6 @@ class CaseDetailCard(QGroupBox):
             
             raw_val = info.get("value", 0.0)
             
-            # Aplica formatação científica para LOLP se habilitado nas configurações
             if key.upper() == "LOLP" and formato_lolp == "scientific":
                 val_formatado = f"{raw_val:.{decimais}e}"
             else:
@@ -137,21 +138,7 @@ class CaseDetailCard(QGroupBox):
         self._adjust_height_to_contents(self.table_ind)
         layout.addWidget(self.table_ind)
 
-        charts_layout = QHBoxLayout()
-        canvas_lole = create_dual_axis_chart([data], "LOLE", "EENS")
-        canvas_lolf = create_dual_axis_chart([data], "LOLF", "LOLD")
-        
-        canvas_lole.setStyleSheet("border: none;")
-        canvas_lolf.setStyleSheet("border: none;")
-        
-        charts_layout.addWidget(canvas_lole)
-        charts_layout.addWidget(canvas_lolf)
-        
-        chart_container = QWidget()
-        chart_container.setLayout(charts_layout)
-        chart_container.setMinimumHeight(300)
-        
-        layout.addWidget(chart_container)
+        # GRÁFICOS REMOVIDOS DAQUI: A visualização em Tabela Rolável agora exibe APENAS a tabela.
 
     def _apply_modern_style(self, table: QTableWidget):
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -196,7 +183,7 @@ class CaseDetailCard(QGroupBox):
 
 class ComparativeTable(QTableWidget):
     """Tabela comparando Múltiplos Casos Lado a Lado para o modo 'Tabela Única'."""
-    def __init__(self, data_list: list): # Removido o parâmetro settings
+    def __init__(self, data_list: list):
         super().__init__()
         
         config = SettingsViewModel().load_settings()
@@ -351,13 +338,11 @@ class TabGlobalView(QWidget):
 
     def load_data(self):
         self.combo_view_type.blockSignals(True)
-        # Substituído a chamada do settings_service pela variável local
         self.combo_view_type.setCurrentIndex(self.current_view_type)
         self.combo_view_type.blockSignals(False)
         self.viewmodel.load_available_cases()
 
     def save_user_preferences(self, index: int):
-        # Agora ele salva na própria view
         self.current_view_type = index
         self.render_view()
 
@@ -403,7 +388,6 @@ class TabGlobalView(QWidget):
         self.render_view()
 
     def clear_layout_recursively(self, layout):
-        """Método utilitário para deletar perfeitamente widgets aninhados."""
         if layout is not None:
             while layout.count():
                 item = layout.takeAt(0)
@@ -418,7 +402,7 @@ class TabGlobalView(QWidget):
         active_data = [self.cases_data[cid] for cid in self.selected_case_ids if cid in self.cases_data]
 
         if view_type == 0:
-            # Tabelas Separadas (Roláveis)
+            # Tabelas Separadas (Roláveis) - SEM GRÁFICOS
             self.content_stack.setCurrentWidget(self.page_type1)
             self.clear_layout_recursively(self.layout_type1)
             
@@ -428,7 +412,7 @@ class TabGlobalView(QWidget):
                 card = CaseDetailCard(data)
                 self.layout_type1.addWidget(card)
         else:
-            # Tabela Única (Comparativo) + Gráficos Globais no fundo
+            # Tabela Única (Comparativo) + Gráficos Globais EMPILHADOS
             self.content_stack.setCurrentWidget(self.page_type2)
             self.clear_layout_recursively(self.layout_type2)
             
@@ -437,20 +421,25 @@ class TabGlobalView(QWidget):
             comp_table = ComparativeTable(active_data)
             self.layout_type2.addWidget(comp_table)
             
-            # Gráficos de Comparação globais (todos os casos combinados)
-            charts_layout = QHBoxLayout()
-            canvas_lole = create_dual_axis_chart(active_data, "LOLE", "EENS")
+            # MUDANÇA AQUI: Layout Vertical para empilhar os gráficos
+            charts_layout = QVBoxLayout()
+            charts_layout.setSpacing(30) # Espaçamento entre os dois gráficos
+            
+            canvas_eens_lole = create_dual_axis_chart(active_data, "EENS", "LOLE")
             canvas_lolf = create_dual_axis_chart(active_data, "LOLF", "LOLD")
             
-            canvas_lole.setStyleSheet("border: none;")
+            canvas_eens_lole.setStyleSheet("border: none;")
             canvas_lolf.setStyleSheet("border: none;")
             
-            charts_layout.addWidget(canvas_lole)
+            # Altura mínima garantida para cada gráfico para eles não ficarem esmagados
+            canvas_eens_lole.setMinimumHeight(400)
+            canvas_lolf.setMinimumHeight(400)
+            
+            charts_layout.addWidget(canvas_eens_lole)
             charts_layout.addWidget(canvas_lolf)
             
             chart_container = QWidget()
             chart_container.setLayout(charts_layout)
-            chart_container.setMinimumHeight(350)
             
             self.layout_type2.addWidget(chart_container)
             self.layout_type2.addStretch()

@@ -1,19 +1,14 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, 
     QTableWidgetItem, QHeaderView, QLineEdit, QFileDialog, QMessageBox, 
-    QProgressDialog, QMenu, QDialog, QDialogButtonBox, QInputDialog
+    QProgressDialog, QMenu, QDialog, QDialogButtonBox, QInputDialog, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtCore import Qt
-from ui.viewmodels.cases_viewmodel import CasesViewModel
-import os
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, 
-    QTableWidgetItem, QHeaderView, QLineEdit, QFileDialog, QMessageBox, 
-    QMenu, QAbstractItemView
-)
 from PyQt6.QtGui import QFont, QCursor
+import os
 
+from ui.viewmodels.cases_viewmodel import CasesViewModel
+from ui.views.import_dialog import ImportSelectionDialog
 
 
 class CaseConfigDialog(QDialog):
@@ -32,8 +27,8 @@ class CaseConfigDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
 
-        # 1. Nome Fictício do Caso
-        lbl_name = QLabel("Nome Fictício / Exibição do Caso:")
+        # 1. Nome Oficial do Caso
+        lbl_name = QLabel("Nome Oficial do Caso (Exibição global):")
         lbl_name.setStyleSheet("font-weight: bold; color: #2C3E50;")
         self.txt_case_name = QLineEdit(current_name)
         self.txt_case_name.setFixedHeight(35)
@@ -43,11 +38,11 @@ class CaseConfigDialog(QDialog):
         layout.addWidget(self.txt_case_name)
 
         # 2. Tabela de Apelidos de Região
-        lbl_regions = QLabel("Apelidos das Regiões (Exibidos em Gráficos e Tabelas):")
+        lbl_regions = QLabel("Apelidos das Regiões (Substituirão os originais em gráficos/tabelas):")
         lbl_regions.setStyleSheet("font-weight: bold; color: #2C3E50;")
         
         self.table_regions = QTableWidget(0, 3)
-        self.table_regions.setHorizontalHeaderLabels(["Cód. Ext.", "Nome Original", "Apelido (Custom)"])
+        self.table_regions.setHorizontalHeaderLabels(["Cód. Ext.", "Nome Original", "Apelido Oficial"])
         self.table_regions.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_regions.setStyleSheet("""
             QTableWidget { background-color: white; border: 1px solid #D5D8DC; }
@@ -138,18 +133,15 @@ class CasesView(QWidget):
 
         # --- Tabela de Casos ---
         self.table = QTableWidget(0, 4)
-        # O último cabeçalho fica propositalmente vazio
         self.table.setHorizontalHeaderLabels(["Nome do Caso", "Data de Importação", "Status", ""])
         
-        # Ajuste de larguras
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(3, 50) # Coluna fininha para os 3 pontinhos
+        self.table.setColumnWidth(3, 50) 
 
-        # Estilização baseada no Guia de Identidade Visual
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -186,64 +178,63 @@ class CasesView(QWidget):
         self.viewmodel.cases_loaded.connect(self.populate_table)
         self.viewmodel.error_occurred.connect(lambda e: QMessageBox.warning(self, "Erro", e))
         self.btn_import.clicked.connect(self.import_case)
+        
+        self.viewmodel.discovery_completed.connect(self.show_import_dialog)
+        self.viewmodel.import_success.connect(lambda m: QMessageBox.information(self, "Sucesso", m))
+        self.viewmodel.import_failed.connect(lambda m: QMessageBox.warning(self, "Falha", m))
 
     def load_data(self):
         self.viewmodel.load_cases()
 
     def import_case(self):
-        # 1. Seleciona a pasta
         folder = QFileDialog.getExistingDirectory(self, "Selecione a pasta do Caso")
         if not folder:
             return
 
-        # 2. Pede ao usuário o nome do caso
-        display_name, ok_name = QInputDialog.getText(self, "Nome do Caso", "Digite um nome de exibição para este caso:")
+        display_name, ok_name = QInputDialog.getText(self, "Nome Oficial do Caso", "Digite o nome definitivo para exibição:")
         if not ok_name or not display_name.strip():
             return
             
-        # 3. Pede ao usuário a versão do software
-        versions = ["RELEVA", "PSMora"]
-        software_version, ok_version = QInputDialog.getItem(
-            self, 
-            "Versão do Software", 
-            "Selecione a versão do software utilizada:", 
-            versions, 
-            0, 
-            False
-        )
-        if not ok_version:
-            return # Cancela a importação se o usuário fechar a janelinha
+        self.viewmodel.discover_case(folder, display_name.strip())
 
-        # 4. Chama o viewmodel passando a pasta, o nome e a versão!
-        self.viewmodel.import_case(folder, display_name.strip(), software_version)
+    def show_import_dialog(self, case_id: str, discovery_details: dict):
+        dialog = ImportSelectionDialog(discovery_details, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            template = dialog.selected_template
+            results = dialog.selected_results
+            software = dialog.selected_software
+            self.viewmodel.run_import(case_id, template, results, software)
 
     def populate_table(self, cases: list):
         self.table.setRowCount(0)
         for row, case in enumerate(cases):
             self.table.insertRow(row)
-            self.table.setRowHeight(row, 45) # Linhas mais altas para respiro
+            self.table.setRowHeight(row, 45) 
             
-            # Coluna 0: Nome
-            item_name = QTableWidgetItem(f"{case.get('external_name', '')} - {case.get('display_name', '')}")
+            # Coluna 0: Nome (Prioriza display_name estritamente)
+            official_name = case.get("display_name")
+            if not official_name:
+                official_name = case.get("external_name", "Desconhecido")
+                
+            item_name = QTableWidgetItem(official_name)
             item_name.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             
             # Coluna 1: Data
-            item_date = QTableWidgetItem(case.get("created_at", "N/A")[:10]) # Simplifica data se for ISO
+            item_date = QTableWidgetItem(case.get("created_at", "N/A")[:10]) 
             item_date.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             
             self.table.setItem(row, 0, item_name)
             self.table.setItem(row, 1, item_date)
             
-            # Coluna 2: Widget Customizado de Status (Bolinha + Texto)
+            # Coluna 2: Widget Customizado de Status
             status_widget = self._create_status_widget(case.get("status", "UNKNOWN"))
             self.table.setCellWidget(row, 2, status_widget)
             
-            # Coluna 3: Widget Customizado de Ações (3 pontinhos)
-            action_btn = self._create_action_button(case.get("id"), case.get("display_name", ""))
+            # Coluna 3: Ações
+            action_btn = self._create_action_button(case.get("id"), official_name)
             self.table.setCellWidget(row, 3, action_btn)
 
     def _create_status_widget(self, status: str) -> QWidget:
-        """Cria um widget centralizado com uma bolinha semântica e o texto do status."""
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -254,20 +245,18 @@ class CasesView(QWidget):
         text = QLabel(status.upper())
         text.setStyleSheet("font-family: Arial; font-size: 12px; font-weight: bold; color: #334155;")
 
-        # Cores mapeadas do Guia de Identidade Visual
         if status.upper() == "READY":
-            dot.setStyleSheet("color: #22C55E; font-size: 14px;") # Verde Sucesso
+            dot.setStyleSheet("color: #22C55E; font-size: 14px;") 
         elif status.upper() == "FAILED":
-            dot.setStyleSheet("color: #EF4444; font-size: 14px;") # Vermelho Alerta
+            dot.setStyleSheet("color: #EF4444; font-size: 14px;") 
         else:
-            dot.setStyleSheet("color: #F59E0B; font-size: 14px;") # Amarelo (Ingesting/Importing)
+            dot.setStyleSheet("color: #F59E0B; font-size: 14px;") 
 
         layout.addWidget(dot)
         layout.addWidget(text)
         return widget
 
     def _create_action_button(self, case_id: str, case_name: str) -> QWidget:
-        """Cria o botão minimalista de 3 pontos para as ações."""
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -285,14 +274,11 @@ class CasesView(QWidget):
             QPushButton:hover { background-color: #E2E8F0; color: #2563EB; }
         """)
         
-        # Conecta o clique ao menu de contexto passando o botão como âncora
         btn.clicked.connect(lambda: self.show_action_menu(btn, case_id, case_name))
-        
         layout.addWidget(btn)
         return widget
 
     def show_action_menu(self, button: QPushButton, case_id: str, case_name: str):
-        """Exibe o menu suspenso de ações logo abaixo dos 3 pontinhos."""
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu { background-color: white; border: 1px solid #E2E8F0; border-radius: 4px; font-family: Arial; padding: 5px; }
@@ -304,16 +290,13 @@ class CasesView(QWidget):
         action_edit = menu.addAction("⚙️ Edit")
         action_delete = menu.addAction("🗑️ Delete")
 
-        # Posição do menu colado abaixo do botão
         pos = button.mapToGlobal(button.rect().bottomLeft())
         selected_action = menu.exec(pos)
 
-        # Direcionamento de Ações
         if selected_action == action_analyze:
             self.analyze_requested.emit(case_id, case_name)
             
         elif selected_action == action_edit:
-            # AGORA PASSAMOS O NOME DO CASO AQUI TAMBÉM!
             self.edit_case(case_id, case_name) 
             
         elif selected_action == action_delete:
@@ -323,13 +306,6 @@ class CasesView(QWidget):
                 self.load_data()
 
     def edit_case(self, case_id: str, case_name: str):
-        """Chama a tela de configuração de caso."""
-        try:
-            # Passando o current_name para o Dialog
-            dialog = CaseConfigDialog(parent=self, case_id=case_id, current_name=case_name, viewmodel=self.viewmodel)
-        except TypeError:
-            # Fallback (caso a ordem dos parâmetros na sua classe seja diferente)
-            dialog = CaseConfigDialog(case_id, case_name, self.viewmodel, self)
-            
+        dialog = CaseConfigDialog(self, case_id, case_name, self.viewmodel)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.load_data() # Atualiza a lista se o nome do caso foi alterado
+            self.load_data()

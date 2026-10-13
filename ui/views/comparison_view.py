@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QListWidget, QListWidgetItem, QTabWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QMessageBox, QGroupBox, QCheckBox, QScrollArea, QFrame,
-    QSizePolicy, QSpinBox, QTreeWidget, QTreeWidgetItem, QToolBox, QRadioButton, QButtonGroup,
+    QSizePolicy, QSpinBox, QTreeWidget, QTreeWidgetItem, QRadioButton, QButtonGroup,
     QDialog, QLineEdit
 )
 
@@ -30,33 +30,94 @@ HOURS_IN_YEAR = 8760
 WEEKS_IN_YEAR = 52
 MONTHS_IN_YEAR = 12
 
+# =========================================================================
+# COMPONENTE DE SEÇÃO COLAPSÁVEL (ACCORDION)
+# =========================================================================
+class CollapsibleBox(QWidget):
+    def __init__(self, title="", parent=None):
+        super().__init__(parent)
+        self.title = title
+        self.is_expanded = True
+        
+        # Botão de Toggle com setinha para baixo por padrão
+        self.toggle_button = QPushButton(f"▼  {self.title}")
+        self.toggle_button.setStyleSheet("""
+            QPushButton {
+                text-align: left;
+                padding: 10px 12px;
+                font-weight: bold;
+                font-size: 13px;
+                background-color: #F1F5F9;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                color: #0F172A;
+            }
+            QPushButton:hover { background-color: #E2E8F0; }
+        """)
+        self.toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_button.clicked.connect(self.toggle)
+        
+        # Área de conteúdo interno
+        self.content_area = QWidget()
+        self.content_layout = QVBoxLayout(self.content_area)
+        self.content_layout.setContentsMargins(10, 10, 10, 10)
+        self.content_layout.setSpacing(8)
+        
+        # Layout Principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 10)
+        main_layout.setSpacing(0)
+        main_layout.addWidget(self.toggle_button)
+        main_layout.addWidget(self.content_area)
+        
+    def toggle(self):
+        self.is_expanded = not self.is_expanded
+        self.content_area.setVisible(self.is_expanded)
+        # Altera a setinha conforme o estado
+        if self.is_expanded:
+            self.toggle_button.setText(f"▼  {self.title}")
+            self.toggle_button.setStyleSheet("""
+                QPushButton { text-align: left; padding: 10px 12px; font-weight: bold; font-size: 13px; background-color: #F1F5F9; border: 1px solid #CBD5E1; border-bottom-left-radius: 0px; border-bottom-right-radius: 0px; border-top-left-radius: 6px; border-top-right-radius: 6px; color: #0F172A; }
+                QPushButton:hover { background-color: #E2E8F0; }
+            """)
+        else:
+            self.toggle_button.setText(f"▶  {self.title}")
+            self.toggle_button.setStyleSheet("""
+                QPushButton { text-align: left; padding: 10px 12px; font-weight: bold; font-size: 13px; background-color: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; color: #0F172A; }
+                QPushButton:hover { background-color: #E2E8F0; }
+            """)
 
 # =========================================================================
 # DIÁLOGO DE FILTRO DE ELEMENTOS
 # =========================================================================
 class ElementFilterDialog(QDialog):
-    def __init__(self, all_elements, active_elements, parent=None):
+    def __init__(self, all_elements, active_elements, non_zero_elements, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Filtrar Elementos")
-        self.resize(350, 450)
+        self.resize(400, 500)
         self.all_elements = all_elements
         self.active_elements = set(active_elements)
+        self.non_zero_elements = set(non_zero_elements)
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
         
-        # Barra de Pesquisa
+        self.chk_hide_zeros = QCheckBox("Ocultar elementos 100% nulos/zerados")
+        self.chk_hide_zeros.setChecked(True)
+        self.chk_hide_zeros.stateChanged.connect(self.filter_list)
+        self.chk_hide_zeros.setStyleSheet("font-weight: bold; color: #0284C7;")
+        layout.addWidget(self.chk_hide_zeros)
+
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Buscar elemento (ex: Barra 1)...")
         self.search_bar.textChanged.connect(self.filter_list)
         self.search_bar.setStyleSheet("padding: 8px; border: 1px solid #CBD5E1; border-radius: 4px;")
         layout.addWidget(self.search_bar)
         
-        # Botões Rápidos
         btn_layout = QHBoxLayout()
-        btn_all = QPushButton("Marcar Tudo")
-        btn_none = QPushButton("Desmarcar Tudo")
+        btn_all = QPushButton("Marcar Visíveis")
+        btn_none = QPushButton("Desmarcar Visíveis")
         btn_all.clicked.connect(self.select_all)
         btn_none.clicked.connect(self.deselect_all)
         for btn in [btn_all, btn_none]:
@@ -66,7 +127,6 @@ class ElementFilterDialog(QDialog):
         btn_layout.addWidget(btn_none)
         layout.addLayout(btn_layout)
         
-        # Lista de Elementos
         self.list_widget = QListWidget()
         self.list_widget.setStyleSheet("border: 1px solid #CBD5E1; border-radius: 4px; padding: 5px;")
         for el in self.all_elements:
@@ -79,18 +139,26 @@ class ElementFilterDialog(QDialog):
             self.list_widget.addItem(item)
         layout.addWidget(self.list_widget)
         
-        # Botão Salvar
         self.btn_save = QPushButton("Aplicar Filtro")
         self.btn_save.setStyleSheet("background-color: #0284C7; color: white; font-weight: bold; padding: 10px; border-radius: 6px;")
         self.btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save.clicked.connect(self.accept)
         layout.addWidget(self.btn_save)
 
-    def filter_list(self, text):
-        search_text = text.lower()
+        self.filter_list()
+
+    def filter_list(self):
+        search_text = self.search_bar.text().lower()
+        hide_zeros = self.chk_hide_zeros.isChecked()
+
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
-            item.setHidden(search_text not in item.text().lower())
+            el_name = item.text()
+            
+            match_search = search_text in el_name.lower()
+            match_zeros = not hide_zeros or (el_name in self.non_zero_elements)
+
+            item.setHidden(not (match_search and match_zeros))
 
     def select_all(self):
         for i in range(self.list_widget.count()):
@@ -119,14 +187,19 @@ class ComparisonView(QWidget):
         super().__init__()
         self.viewmodel = ComparisonViewModel()
         self.settings_vm = SettingsViewModel()
+        
         self.cases_mapping = {}
         self.current_data = {}
         self.case_ids_cache = []
         self.case_names_cache = []
         
-        # Filtros e Séries Temporais
+        # MEMÓRIA PERSISTENTE PARA AS SELEÇÕES
+        self.selected_cases_memory = set()
+        
+        # Filtros Otimizados
         self.active_elements_filter = [] 
-        self.current_ts_data = {} # Dados para a aba ENS
+        self.non_zero_elements = set() 
+        self.current_ts_data = {} 
         
         self.chart_colors = ['#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6']
         
@@ -136,8 +209,6 @@ class ComparisonView(QWidget):
     def setup_ui(self):
         self.setStyleSheet("""
         QWidget { font-family: "Segoe UI", Arial, sans-serif; color: #0F172A; background-color: #F8FAFC; }
-        QToolBox::tab { background-color: #F1F5F9; color: #0F172A; font-weight: bold; border-radius: 4px; padding: 5px; }
-        QToolBox::tab:selected { background-color: #E0F2FE; color: #0369A1; }
         QGroupBox { font-weight: bold; border: 1px solid #CBD5E1; border-radius: 8px; margin-top: 15px; padding-top: 15px; background-color: #FFFFFF; }
         QComboBox, QSpinBox { border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px; background-color: #FFFFFF; }
         QComboBox:hover, QSpinBox:hover { border: 1px solid #0284C7; }
@@ -171,9 +242,9 @@ class ComparisonView(QWidget):
         self.build_dynamic_tabs()
         base_layout.addWidget(self.main_content, stretch=1)
 
-        # 2. BARRA LATERAL DIREITA
+        # 2. BARRA LATERAL DIREITA (Substituindo QToolBox por CollapsibleBox)
         self.right_sidebar = QFrame()
-        self.right_sidebar.setFixedWidth(280)
+        self.right_sidebar.setFixedWidth(300)
         self.right_sidebar.setStyleSheet("QFrame { background-color: #FFFFFF; border-left: 1px solid #E2E8F0; }")
         rs_layout = QVBoxLayout(self.right_sidebar)
         rs_layout.setContentsMargins(15, 20, 15, 20)
@@ -182,26 +253,34 @@ class ComparisonView(QWidget):
         rs_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #0F172A; border: none;")
         rs_layout.addWidget(rs_title)
 
-        self.toolbox = QToolBox()
-        self.toolbox.setStyleSheet("border: none;")
+        # Envolvemos as seções em um ScrollArea para evitar corte em telas menores
+        self.sidebar_scroll = QScrollArea()
+        self.sidebar_scroll.setWidgetResizable(True)
+        self.sidebar_scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
         
-        self.page_cases = QWidget()
-        page_cases_layout = QVBoxLayout(self.page_cases)
-        page_cases_layout.setContentsMargins(5, 10, 5, 10)
-        
+        self.sidebar_content = QWidget()
+        self.sidebar_content_layout = QVBoxLayout(self.sidebar_content)
+        self.sidebar_content_layout.setContentsMargins(0, 5, 0, 5)
+        self.sidebar_content_layout.setSpacing(10)
+        self.sidebar_content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Seção 1: Casos em Funcionamento
+        self.box_cases = CollapsibleBox("Casos em Funcionamento")
         self.scroll_cases = QScrollArea()
         self.scroll_cases.setWidgetResizable(True)
+        self.scroll_cases.setMinimumHeight(150) # Altura mínima para a lista interna
+        self.scroll_cases.setStyleSheet("QScrollArea { border: 1px solid #E2E8F0; border-radius: 4px; background-color: #F8FAFC; }")
+        
         self.cases_container = QWidget()
         self.cases_layout = QVBoxLayout(self.cases_container)
         self.cases_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.scroll_cases.setWidget(self.cases_container)
-        page_cases_layout.addWidget(self.scroll_cases)
-        self.toolbox.addItem(self.page_cases, "1. Casos em Funcionamento")
-
-        self.page_granularity = QWidget()
-        page_gran_layout = QVBoxLayout(self.page_granularity)
-        page_gran_layout.setContentsMargins(5, 10, 5, 10)
         
+        # Insere o ScrollArea dentro da caixa colapsável
+        self.box_cases.content_layout.addWidget(self.scroll_cases)
+        
+        # Seção 2: Nível de Granularidade
+        self.box_granularity = CollapsibleBox("Nível de Granularidade")
         self.gran_group = QButtonGroup(self)
         self.rad_global = QRadioButton("Global")
         self.rad_region = QRadioButton("Por Região")
@@ -212,13 +291,18 @@ class ComparisonView(QWidget):
         self.gran_group.addButton(self.rad_region, 2)
         self.gran_group.addButton(self.rad_bus, 3)
         
-        page_gran_layout.addWidget(self.rad_global)
-        page_gran_layout.addWidget(self.rad_region)
-        page_gran_layout.addWidget(self.rad_bus)
-        page_gran_layout.addStretch()
-        self.toolbox.addItem(self.page_granularity, "2. Nível de Granularidade")
+        self.box_granularity.content_layout.addWidget(self.rad_global)
+        self.box_granularity.content_layout.addWidget(self.rad_region)
+        self.box_granularity.content_layout.addWidget(self.rad_bus)
 
-        rs_layout.addWidget(self.toolbox)
+        # Adiciona as seções colapsáveis ao layout lateral
+        self.sidebar_content_layout.addWidget(self.box_cases)
+        self.sidebar_content_layout.addWidget(self.box_granularity)
+        self.sidebar_content_layout.addStretch()
+        
+        self.sidebar_scroll.setWidget(self.sidebar_content)
+        rs_layout.addWidget(self.sidebar_scroll)
+        
         base_layout.addWidget(self.right_sidebar)
 
         # 3. DRAWER (PERSONALIZAR GRÁFICO)
@@ -297,9 +381,10 @@ class ComparisonView(QWidget):
     def open_filter_dialog(self):
         if not self.current_data: return
         all_elements = [el.get("element_name") for el in self.current_data.get("elements", [])]
-        dialog = ElementFilterDialog(all_elements, self.active_elements_filter, self)
+        dialog = ElementFilterDialog(all_elements, self.active_elements_filter, self.non_zero_elements, self)
         if dialog.exec():
             self.active_elements_filter = dialog.get_selected_elements()
+            self.update_table_view()
             self.plot_all_charts()
 
     # =========================================================================
@@ -336,6 +421,14 @@ class ComparisonView(QWidget):
         self.combo_sort_bar = QComboBox()
         self.combo_sort_bar.addItems(["Padrão", "Crescente (Barras)", "Decrescente (Barras)"])
         controls_layout.addWidget(self.combo_sort_bar)
+
+        # Otimização de Performance
+        controls_layout.addWidget(QLabel("<b>Máx Exibição:</b>"))
+        self.spin_max_elements_bar = QSpinBox()
+        self.spin_max_elements_bar.setRange(5, 10000)
+        self.spin_max_elements_bar.setValue(50)
+        self.spin_max_elements_bar.valueChanged.connect(self.plot_bar)
+        controls_layout.addWidget(self.spin_max_elements_bar)
         
         # Botão Filtro de Elementos
         self.btn_filter_compare = QPushButton()
@@ -361,6 +454,14 @@ class ComparisonView(QWidget):
         self.combo_ind_simple = QComboBox()
         self.combo_ind_simple.currentIndexChanged.connect(self.plot_simple_chart)
         controls_layout.addWidget(self.combo_ind_simple)
+
+        # Otimização de Performance
+        controls_layout.addWidget(QLabel("<b>Máx Exibição:</b>"))
+        self.spin_max_elements_simple = QSpinBox()
+        self.spin_max_elements_simple.setRange(5, 10000)
+        self.spin_max_elements_simple.setValue(50)
+        self.spin_max_elements_simple.valueChanged.connect(self.plot_simple_chart)
+        controls_layout.addWidget(self.spin_max_elements_simple)
         
         # Botão Filtro de Elementos
         self.btn_filter_simple = QPushButton()
@@ -382,7 +483,6 @@ class ComparisonView(QWidget):
         
         controls_layout = QHBoxLayout()
         
-        # Tipo de Gráfico
         self.ens_type_group = QButtonGroup(self)
         self.rad_ens_col = QRadioButton("Gráfico de Colunas")
         self.rad_ens_line = QRadioButton("Gráfico de Linhas")
@@ -395,7 +495,6 @@ class ComparisonView(QWidget):
         controls_layout.addWidget(self.rad_ens_line)
         controls_layout.addSpacing(15)
         
-        # NOVO: Seleção da Série ENS
         controls_layout.addWidget(QLabel("<b>Série:</b>"))
         self.combo_ens_series = QComboBox()
         self.combo_ens_series.addItems(["Mista (G&T)", "Geração", "Transmissão"])
@@ -403,7 +502,6 @@ class ComparisonView(QWidget):
         controls_layout.addWidget(self.combo_ens_series)
         controls_layout.addSpacing(15)
         
-        # Granularidade Temporal
         controls_layout.addWidget(QLabel("<b>Granularidade:</b>"))
         self.combo_ens_granularity = QComboBox()
         self.combo_ens_granularity.addItems(["Horas", "Semanas", "Meses"])
@@ -411,7 +509,6 @@ class ComparisonView(QWidget):
         controls_layout.addWidget(self.combo_ens_granularity)
         controls_layout.addSpacing(15)
         
-        # Intervalos
         controls_layout.addWidget(QLabel("<b>Intervalo:</b>"))
         self.spin_ens_min = QSpinBox()
         self.spin_ens_min.setRange(0, HOURS_IN_YEAR)
@@ -462,10 +559,28 @@ class ComparisonView(QWidget):
 
         for case in cases:
             if case.get("status", "") == "READY":
+                case_id = case.get("id")
                 cb = QCheckBox(f"{case.get('external_name', '')} - {case.get('display_name', '')}")
-                cb.setProperty("case_id", case.get("id"))
-                cb.stateChanged.connect(self.run_comparison)
+                cb.setProperty("case_id", case_id)
+                
+                # Restaurando o estado do checkbox com base na nossa memória
+                if case_id in self.selected_cases_memory:
+                    cb.setChecked(True)
+                
+                cb.stateChanged.connect(self.on_case_checkbox_changed)
                 self.cases_layout.addWidget(cb)
+
+    def on_case_checkbox_changed(self):
+        """Atualiza a memória persistente sempre que o usuário altera a seleção."""
+        cb = self.sender()
+        case_id = cb.property("case_id")
+        
+        if cb.isChecked():
+            self.selected_cases_memory.add(case_id)
+        else:
+            self.selected_cases_memory.discard(case_id)
+            
+        self.run_comparison()
 
     def get_selected_granularity(self):
         if self.rad_global.isChecked(): return "GLOBAL"
@@ -476,13 +591,22 @@ class ComparisonView(QWidget):
         selected_ids = []
         selected_names = []
         
+        # Coleta diretamente da interface ou da memória
         for i in range(self.cases_layout.count()):
             cb = self.cases_layout.itemAt(i).widget()
             if isinstance(cb, QCheckBox) and cb.isChecked():
                 selected_ids.append(cb.property("case_id"))
                 selected_names.append(cb.text())
 
-        if not selected_ids: return 
+        # Se desmarcar tudo, limpamos a interface
+        if not selected_ids: 
+            self.current_data = {}
+            self.update_table_view()
+            self.bar_figure.clear()
+            self.bar_canvas.draw()
+            self.simple_figure.clear()
+            self.simple_canvas.draw()
+            return 
 
         self.case_ids_cache = selected_ids
         self.case_names_cache = selected_names
@@ -499,8 +623,26 @@ class ComparisonView(QWidget):
         indicadores = response_data.get("indicators", [])
         elements = response_data.get("elements", [])
         
-        # Inicializa todos os elementos como ativos no filtro padrão
-        self.active_elements_filter = [el.get("element_name") for el in elements]
+        self.non_zero_elements.clear()
+        active_defaults = []
+        
+        for el in elements:
+            el_name = el.get("element_name")
+            has_valid_data = False
+            vals_by_case = el.get("values_by_case", {})
+            
+            for c_id, ind_dict in vals_by_case.items():
+                for ind_val in ind_dict.values():
+                    if ind_val is not None and abs(ind_val) > 1e-9: 
+                        has_valid_data = True
+                        break
+                if has_valid_data: break
+                
+            if has_valid_data:
+                self.non_zero_elements.add(el_name)
+                active_defaults.append(el_name)
+        
+        self.active_elements_filter = active_defaults
         
         if not indicadores: return
 
@@ -523,25 +665,29 @@ class ComparisonView(QWidget):
         self.plot_all_charts()
 
     def render_ens_data(self, ts_data: dict):
-        # Callback para a chamada do ViewModel quando ele retornar os dados JSON de ENS
         self.current_ts_data = ts_data
         self.plot_ens_chart()
 
     def update_table_view(self):
-        if not self.current_data: return
+        if not self.current_data: 
+            self.table.clear()
+            self.table.setRowCount(0)
+            return
+            
         config = self.settings_vm.load_settings()
         decimais = config.get("precisao_tabelas", 2)
         
         indicadores_completos = self.current_data.get("indicators", [])
         unidades = self.current_data.get("units", {})
         
-        # Tabela respeita o filtro
         elements = [el for el in self.current_data.get("elements", []) if el.get("element_name") in self.active_elements_filter]
         
         selected_ind = self.combo_table_filter.currentText()
         indicadores = indicadores_completos if selected_ind == "Todos os Indicadores" else [selected_ind]
 
+        self.table.setUpdatesEnabled(False)
         self.table.clear()
+        
         headers = ["Elemento", "Indicador", "Unidade"] + self.case_names_cache
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
@@ -560,6 +706,8 @@ class ComparisonView(QWidget):
                     val_str = "-" if val is None else f"{val:.{decimais}f}"
                     self.table.setItem(row_idx, 3 + col_idx, QTableWidgetItem(val_str))
                 row_idx += 1
+                
+        self.table.setUpdatesEnabled(True)
 
     def plot_all_charts(self):
         self.plot_bar()
@@ -582,7 +730,6 @@ class ComparisonView(QWidget):
         ind_line = self.combo_ind_line.currentText()
         if not ind_bar or not ind_line: return
 
-        # Filtrar elementos baseados no popup
         elements = [el for el in self.current_data.get("elements", []) if el.get("element_name") in self.active_elements_filter]
         if not elements: 
             self.bar_canvas.draw()
@@ -593,6 +740,9 @@ class ComparisonView(QWidget):
             elements.sort(key=lambda x: np.mean([x.get("values_by_case", {}).get(c, {}).get(ind_bar, 0.0) or 0.0 for c in self.case_ids_cache]))
         elif "Decrescente" in sort_mode: 
             elements.sort(key=lambda x: np.mean([x.get("values_by_case", {}).get(c, {}).get(ind_bar, 0.0) or 0.0 for c in self.case_ids_cache]), reverse=True)
+
+        limit = self.spin_max_elements_bar.value()
+        elements = elements[:limit]
 
         n_cases = len(self.case_ids_cache)
         element_names = [el.get("element_name", "") for el in elements]
@@ -609,11 +759,11 @@ class ComparisonView(QWidget):
 
             vals_line = [el.get("values_by_case", {}).get(case_id, {}).get(ind_line) or 0.0 for el in elements]
             vals_line = [round(v, decimais) for v in vals_line]
-            self.bar_ax2.plot(x + offset, vals_line, marker='o', color=color, linewidth=2, label=f"{self.case_names_cache[c]} (Linhas)")
+            self.bar_ax2.plot(x + offset, vals_line, marker='o' if limit < 100 else '', color=color, linewidth=2, label=f"{self.case_names_cache[c]} (Linhas)")
 
         if self.chk_show_titles.isChecked():
             self.bar_ax.set_xticks(x)
-            self.bar_ax.set_xticklabels(element_names, rotation=45, ha='right')
+            self.bar_ax.set_xticklabels(element_names, rotation=45, ha='right', fontsize=8 if limit > 20 else 10)
         else:
             self.bar_ax.set_xticks([])
             
@@ -622,7 +772,7 @@ class ComparisonView(QWidget):
         
         self.bar_ax.set_ylabel(f"{ind_bar} {f'({unidade_bar})' if unidade_bar else ''}", fontweight='bold', color='#475569')
         self.bar_ax2.set_ylabel(f"{ind_line} {f'({unidade_line})' if unidade_line else ''}", fontweight='bold', color='#0F172A')
-        self.bar_ax.set_title(f"{ind_bar} vs {ind_line}", pad=15, fontweight='bold')
+        self.bar_ax.set_title(f"{ind_bar} vs {ind_line} (Top {len(elements)})", pad=15, fontweight='bold')
         
         if grid_style == "Horizontais": self.bar_ax.grid(axis='y', linestyle='--', alpha=0.4)
         elif grid_style == "Horizontais e Verticais": self.bar_ax.grid(True, linestyle='--', alpha=0.4)
@@ -647,12 +797,14 @@ class ComparisonView(QWidget):
         ind = self.combo_ind_simple.currentText()
         if not ind: return
 
-        # Filtrar elementos
         elements = [el for el in self.current_data.get("elements", []) if el.get("element_name") in self.active_elements_filter]
         if not elements: 
             self.simple_canvas.draw()
             return
             
+        limit = self.spin_max_elements_simple.value()
+        elements = elements[:limit]
+
         n_cases = len(self.case_ids_cache)
         element_names = [el.get("element_name", "") for el in elements]
         x = np.arange(len(element_names))
@@ -668,13 +820,13 @@ class ComparisonView(QWidget):
 
         if self.chk_show_titles.isChecked():
             self.simple_ax.set_xticks(x)
-            self.simple_ax.set_xticklabels(element_names, rotation=45, ha='right')
+            self.simple_ax.set_xticklabels(element_names, rotation=45, ha='right', fontsize=8 if limit > 20 else 10)
         else:
             self.simple_ax.set_xticks([])
             
         unidade = self.current_data.get("units", {}).get(ind, "")
         self.simple_ax.set_ylabel(f"{ind} {f'({unidade})' if unidade else ''}", fontweight='bold')
-        self.simple_ax.set_title(f"Visualização de {ind}", pad=15, fontweight='bold')
+        self.simple_ax.set_title(f"Visualização de {ind} (Top {len(elements)})", pad=15, fontweight='bold')
         self.simple_ax.spines['top'].set_visible(False)
         self.simple_ax.spines['right'].set_visible(False)
         self.simple_ax.grid(axis='y', linestyle='--', alpha=0.4)
@@ -708,7 +860,6 @@ class ComparisonView(QWidget):
         self.plot_ens_chart()
 
     def plot_ens_chart(self):
-        """ Renderiza o gráfico de ENS adaptado ao intervalo, granularidade e tipo de série. """
         self.ens_figure.clear()
         self.ens_ax = self.ens_figure.add_subplot(111)
         
@@ -724,12 +875,10 @@ class ComparisonView(QWidget):
         gran = self.combo_ens_granularity.currentText()
         is_line = self.rad_ens_line.isChecked()
         
-        # Mapeamento do número de agregamentos. O DB é sempre horario.
         bucket_size = 1
         if gran == "Semanas": bucket_size = HOURS_IN_YEAR // WEEKS_IN_YEAR
         elif gran == "Meses": bucket_size = HOURS_IN_YEAR // MONTHS_IN_YEAR
         
-        # NOVO: Define qual chave de dados buscar no dicionário do ViewModel
         series_map = {
             "Mista (G&T)": "ens_array",
             "Geração": "geracao",
@@ -745,23 +894,18 @@ class ComparisonView(QWidget):
         for c, case_id in enumerate(self.case_ids_cache):
             color = self.chart_colors[c % len(self.chart_colors)]
             
-            # Puxa a série dinamicamente baseada na escolha do usuário
             raw_data = self.current_ts_data.get(str(case_id), {}).get(data_key, [])
-            
             if not raw_data:
-                # Preenchimento temporário se o ViewModel não tiver carregado a série
                 raw_data = np.random.uniform(0, 50, HOURS_IN_YEAR) 
                 
             raw_data = np.array(raw_data)
             
-            # Agregação de tempo (Soma)
             if bucket_size > 1:
                 trunc_len = (len(raw_data) // bucket_size) * bucket_size
                 agg_data = raw_data[:trunc_len].reshape(-1, bucket_size).sum(axis=1)
             else:
                 agg_data = raw_data
                 
-            # Aplicar filtro de intervalo
             filtered_data = agg_data[min_val:max_val]
             x_vals = np.arange(min_val, min_val + len(filtered_data))
             

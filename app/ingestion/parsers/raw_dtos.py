@@ -38,3 +38,8 @@ class RawTimeSeriesBlockDTO:
 @dataclass
 class RawTimeSeriesDTO:
     series: List[RawTimeSeriesBlockDTO] = field(default_factory=list)
+
+@dataclass
+class RawSystemSummaryDTO:
+    general_info: Dict[str, str]
+    generators_info: List[Dict[str, str]]

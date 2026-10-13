@@ -9,6 +9,9 @@ class CaseCandidate:
     """
     root_path: Path
     case_name: str
+
+    system_templates: List[Path] = field(default_factory=list)
+    result_directories: List[Path] = field(default_factory=list)
     detected_templates: List[Path] = field(default_factory=list)
     detected_result_directories: List[Path] = field(default_factory=list)
     detected_result_files: List[Path] = field(default_factory=list)

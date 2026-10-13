@@ -8,6 +8,7 @@ from app.domain.interfaces.case_repository import CaseRepository
 from app.domain.exceptions.base_exceptions import RepositoryError
 from app.infrastructure.database.models.case_model import CaseModel
 from app.infrastructure.database.mappers.case_mapper import CaseMapper
+from app.infrastructure.database.models.case_model import CaseModel
 
 class PostgresCaseRepository(CaseRepository):
     def __init__(self, session: Session):
@@ -53,3 +54,16 @@ class PostgresCaseRepository(CaseRepository):
             return [CaseMapper.to_domain(m) for m in models]
         except Exception as e:
             raise RepositoryError(f"Erro ao listar Casos: {str(e)}") from e
+
+    def create(self, external_name: str, display_name: str, source_path: str, status: str) -> CaseModel:
+        """Cria um novo registro de Caso no banco de dados."""
+        new_case = CaseModel(
+            external_name=external_name,
+            display_name=display_name,
+            source_path=source_path,
+            status=status
+        )
+        self.session.add(new_case)
+        self.session.flush() # Sincroniza com o banco para gerar o UUID imediatamente antes do commit do router
+        
+        return new_case
