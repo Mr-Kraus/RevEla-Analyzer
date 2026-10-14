@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 
 from app.infrastructure.database.models.reliability_result_model import ReliabilityResultModel
 from app.infrastructure.database.models.bus_model import BusModel
@@ -46,7 +46,7 @@ class AnalyticalIndicatorRepository:
                 BusModel.external_id.label("bus_external_id"),
                 BusModel.name.label("bus_name"),
                 RegionModel.external_id.label("region_external_id"),
-                RegionModel.name.label("region_name"),
+                func.coalesce(RegionModel.alias, RegionModel.name).label("region_name"), # <-- COALESCE APLICADO AQUI
                 column_attr.label("indicator_value")
             )
             .select_from(ReliabilityResultModel)

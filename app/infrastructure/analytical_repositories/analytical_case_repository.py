@@ -6,6 +6,8 @@ from sqlalchemy import select
 from app.infrastructure.database.models.case_model import CaseModel
 from app.infrastructure.database.models.simulation_model import SimulationRunModel
 
+
+
 class AnalyticalCaseRepository:
     """Repositório de leitura (M03-F04) para buscar rodadas de simulação e cenários comparativos."""
     

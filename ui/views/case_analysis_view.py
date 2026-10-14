@@ -151,7 +151,7 @@ class CaseAnalysisView(QWidget):
         self.table_global.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table_global.setAlternatingRowColors(True)
         self.table_global.verticalHeader().setVisible(False)
-        self.table_global.setFixedHeight(180) # Altura fixa para não ocupar a tela toda
+        self.table_global.setFixedHeight(260) # Altura aumentada para remover o scroll da tabela
         left_layout.addWidget(self.table_global)
 
         # 3. Tabela System Summary
@@ -310,8 +310,6 @@ class CaseAnalysisView(QWidget):
 
         elif hasattr(self, 'tab_geral') and current_widget == self.tab_geral:
             if self.loaded_geral_case_id != self.current_case_id:
-                # O ViewModel precisa chamar a API ou passar o mock. 
-                # (Estou injetando o mock localmente caso o ViewModel ainda não retorne esses novos dados)
                 self.viewmodel.fetch_geral_data(self.current_case_id)
                 self.loaded_geral_case_id = self.current_case_id
 
@@ -390,27 +388,24 @@ class CaseAnalysisView(QWidget):
         if sum(values) == 0:
             self.donut_ax.text(0.5, 0.5, "Sem dados de geração", ha='center', va='center', color='#94A3B8')
         else:
-            # LÓGICA ANTI-CONGLOMERADO: Esconde porcentagens menores que 4%
-            def custom_autopct(pct):
-                return f"{pct:.1f}%" if pct >= 4.0 else ""
+            # LÓGICA ANTI-CONGLOMERADO: Nomenclatura no Matplotlib para colocar a porcentagem nos labels externos
+            # Combinamos o nome da fatia com o seu valor percentual arredondado
+            total = sum(values)
+            custom_labels = [f"{l} ({v/total*100:.1f}%)" if (v/total*100) >= 4.0 else l for l, v in zip(labels, values)]
 
-            # labels=None remove as palavras coladas no gráfico
-            wedges, texts, autotexts = self.donut_ax.pie(
-                values, labels=None, autopct=custom_autopct, 
+            # autopct=None tira o número de cima da fatia
+            wedges, texts = self.donut_ax.pie(
+                values, labels=None, autopct=None, 
                 startangle=90, colors=self.donut_colors[:len(values)],
                 wedgeprops=dict(width=0.4, edgecolor='white')
             )
-            
-            for autotext in autotexts:
-                autotext.set_color('white')
-                autotext.set_fontsize(9)
                 
-            # Cria uma legenda externa organizada
+            # Cria a legenda utilizando os rótulos combinados custom_labels
             self.donut_ax.legend(
-                wedges, labels,
+                wedges, custom_labels,
                 title="Tecnologias",
                 loc="center left",
-                bbox_to_anchor=(0.9, 0.5), # Posiciona fora da rosquinha
+                bbox_to_anchor=(0.9, 0.5),
                 frameon=False,
                 fontsize=9
             )
